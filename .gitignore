@@ -179,3 +179,30 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+
+# Project-specific data and caches
+data/
+data_raw/
+data_processed/
+downloads/
+*.pdf
+*.docx
+*.cif
+*.db
+*.sqlite
+*.tar.gz
+*.zip
+
+# Local Vector DB & models storage
+pgdata/
+chroma_db/
+qdrant_storage/
+models/
+huggingface_cache/
+.ollama/
+
+# Implementation plans and blueprints (local reference only)
+docs/plans/
+plan/
+*implementation-plan.md
