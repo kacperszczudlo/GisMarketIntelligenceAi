@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from typing import Generator
+from typing import Generator, Optional
 import psycopg2
 from psycopg2.extensions import connection, cursor
 from psycopg2.pool import SimpleConnectionPool
@@ -10,24 +10,33 @@ class DatabaseManager:
     """Manages PostgreSQL connection pooling and transactional cursors."""
 
     def __init__(self, minconn: int = 1, maxconn: int = 10) -> None:
-        self._pool = SimpleConnectionPool(
-            minconn=minconn,
-            maxconn=maxconn,
-            host=settings.POSTGRES_HOST,
-            port=settings.POSTGRES_PORT,
-            dbname=settings.POSTGRES_DB,
-            user=settings.POSTGRES_USER,
-            password=settings.POSTGRES_PASSWORD,
-        )
+        self.minconn = minconn
+        self.maxconn = maxconn
+        self._pool: Optional[SimpleConnectionPool] = None
+
+    def _ensure_pool(self) -> SimpleConnectionPool:
+        """Lazily initializes the connection pool when first required."""
+        if self._pool is None:
+            self._pool = SimpleConnectionPool(
+                minconn=self.minconn,
+                maxconn=self.maxconn,
+                host=settings.POSTGRES_HOST,
+                port=settings.POSTGRES_PORT,
+                dbname=settings.POSTGRES_DB,
+                user=settings.POSTGRES_USER,
+                password=settings.POSTGRES_PASSWORD,
+            )
+        return self._pool
 
     @contextmanager
     def get_connection(self) -> Generator[connection, None, None]:
         """Context manager to borrow a connection from the pool and return it."""
-        conn = self._pool.getconn()
+        pool = self._ensure_pool()
+        conn = pool.getconn()
         try:
             yield conn
         finally:
-            self._pool.putconn(conn)
+            pool.putconn(conn)
 
     @contextmanager
     def get_cursor(self, commit: bool = False) -> Generator[cursor, None, None]:
@@ -46,7 +55,9 @@ class DatabaseManager:
 
     def close_all(self) -> None:
         """Closes all connections in the pool."""
-        self._pool.closeall()
+        if self._pool is not None:
+            self._pool.closeall()
+            self._pool = None
 
 
 db_manager = DatabaseManager()
