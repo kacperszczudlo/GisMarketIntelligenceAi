@@ -1,3 +1,5 @@
+from src.inference.report_generator import TenderReportGenerator
+from src.ui.app import RAG_QUESTION_TEMPLATES
 from src.ui.components import (
     format_short_ocds_id,
     get_glassmorphism_stylesheet,
@@ -5,6 +7,7 @@ from src.ui.components import (
     highlight_domain_terms,
     render_citation_box,
     render_competitor_matrix,
+    render_direct_answer_card,
     render_insight_section_card,
     render_kio_warning,
     render_red_flag_badge,
@@ -89,3 +92,27 @@ def test_render_insight_section_card_and_short_id():
     )
     assert "1. Zakres i przedmiot zamówienia" in section_html
     assert "BDOT500" in section_html
+
+
+def test_rag_question_templates_and_direct_answer():
+    assert len(RAG_QUESTION_TEMPLATES) >= 8
+    sample_ctx = (
+        "1. Przedmiotem zamowienia jest kompleksowa modernizacja bazy danych BDOT500 oraz inicjalizacja bazy GESUT. "
+        "2. Szacunkowa wartosc zamowienia wynosi 320 000,00 PLN netto. "
+        "3. Wykonawca zobowiazany jest do przekazania zbiorow w zamknietym formacie natywnym .str kompatybilnym z EWMAPA. "
+        "4. Za kazdy dzien zwloki Zamawiajacy naliczy kare umowna w wysokosci 2% wynagrodzenia brutto bez gornego limitu kar."
+    )
+    ans_penalty = TenderReportGenerator.answer_specific_question(
+        RAG_QUESTION_TEMPLATES["2. Kary umowne za zwłokę i brak górnego limitu (art. 436 PZP)"],
+        sample_ctx,
+    )
+    assert "2%" in ans_penalty
+    assert "Załącznik SWZ" in ans_penalty
+
+    card_html = render_direct_answer_card(
+        question="Jakie kary umowne przewidziano?",
+        answer=ans_penalty,
+    )
+    assert "Bezpośrednia odpowiedź asystenta RAG" in card_html
+    assert "2%" in card_html
+

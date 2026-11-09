@@ -636,3 +636,33 @@ def render_insight_section_card(title: str, body: str, icon_name: str, accent_co
         </div>
     </div>
     """)
+
+
+def render_direct_answer_card(question: str, answer: str) -> str:
+    """Renders a foreground spotlight glass card with the direct RAG answer to the user's question."""
+    sparkles_svg = get_svg_icon("sparkles", size=24, color="#38bdf8")
+    safe_q = html.escape(question.strip())
+    formatted_ans = highlight_domain_terms(answer.strip())
+    return _compact_html(f"""
+    <div class="glass-layer-3" style="margin:12px 0 20px 0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.14);">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <div style="width:40px;height:40px;border-radius:10px;background:rgba(56,189,248,0.16);border:1px solid rgba(56,189,248,0.38);display:flex;align-items:center;justify-content:center;">
+                    {sparkles_svg}
+                </div>
+                <div>
+                    <div style="font-size:0.76rem;text-transform:uppercase;letter-spacing:0.06em;color:#7dd3fc;font-weight:700;">
+                        Bezpośrednia odpowiedź asystenta RAG
+                    </div>
+                    <div style="font-size:1rem;font-weight:700;color:#ffffff;margin-top:2px;">
+                        Pytanie: {safe_q}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div style="font-size:0.98rem;line-height:1.65;color:#f8fafc;max-width:85ch;">
+            {formatted_ans}
+        </div>
+    </div>
+    """)
+

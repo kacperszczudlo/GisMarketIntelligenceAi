@@ -2,7 +2,6 @@ import asyncio
 import html
 import logging
 from pathlib import Path
-import re
 import sys
 from typing import Any, Dict
 
@@ -25,6 +24,7 @@ from src.ui.components import (
     get_svg_icon,
     render_citation_box,
     render_competitor_matrix,
+    render_direct_answer_card,
     render_insight_section_card,
     render_kio_warning,
     render_red_flag_badge,
@@ -39,17 +39,29 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-AUDIT_PRESETS: Dict[str, str] = {
-    "Pełny audyt barier SWZ i ryzyka KIO": (
-        "Bariery rynkowe, wymóg formatu .str, oprogramowanie EWMAPA, kary umowne oraz podstawy odwołania do KIO"
+RAG_QUESTION_TEMPLATES: Dict[str, str] = {
+    "1. Blokada formatu danych (.str / EWMAPA vs otwarty GML)": (
+        "Czy zamawiający narzuca zamknięty format natywny .str kompatybilny z programem EWMAPA bez udostępnienia struktury pośredniej GML?"
     ),
-    "Weryfikacja blokad formatu (.str / EWMAPA / GML)": (
-        "Wymagania techniczne, formaty wymiany danych .str, GML, EWMAPA, integracja z bazą OŚRODEK i portalem iMPA"
+    "2. Kary umowne za zwłokę i brak górnego limitu (art. 436 PZP)": (
+        "Jaką wysokość kary umownej za każdy dzień zwłoki przewidział zamawiający i czy umowa zawiera górny limit kar?"
     ),
-    "Analiza kar umownych i wymogów kadrowych": (
-        "Warunki udziału w postępowaniu, uprawnienia geodezyjne zakresu 1 i 2, kary umowne za zwłokę"
+    "3. Uprawnienia geodezyjne GUGiK i doświadczenie kierownika prac": (
+        "Jakich uprawnień zawodowych GUGiK (zakres 1 i 2) oraz jakiego minimalnego doświadczenia wymaga zamawiający od kierownika prac geodezyjnych?"
     ),
-    "Własne pytanie do dokumentacji SWZ": "",
+    "4. Integracja z bazą PODGiK (OŚRODEK) i portalem mapowym (iMPA)": (
+        "Z jaką bazą danych ośrodka (np. OŚRODEK) oraz jakim portalem mapowym (np. iMPA firmy Geo-System) wymagana jest bezpośrednia integracja?"
+    ),
+    "5. Zakres prac modernizacyjnych (BDOT500 / GESUT / EGiB) i budżet": (
+        "Jaki jest dokładny zakres modernizacji baz BDOT500, GESUT i EGiB oraz jaka jest szacunkowa wartość zamówienia netto?"
+    ),
+    "6. Podstawy prawne odwołania do KIO (art. 16 i art. 99 PZP)": (
+        "Które wymogi techniczne w OPZ stanowią barierę Vendor Lock-in naruszającą art. 16 i art. 99 PZP oraz uzasadniają odwołanie do KIO?"
+    ),
+    "7. Klauzule społeczne i zastrzeżenia podmiotowe (art. 94 PZP)": (
+        "Czy zamawiający zastrzegł w ogłoszeniu, że o udzielenie zamówienia mogą ubiegać się wyłącznie wykonawcy wskazani w art. 94 ustawy PZP?"
+    ),
+    "8. Własne pytanie (wpisz ręcznie w polu poniżej)": "",
 }
 
 
@@ -124,8 +136,11 @@ def get_retrieval_pipeline() -> RetrievalPipeline:
 def run_rag_analysis(ocds_id: str, title: str, municipality: str, custom_query: str = "") -> Dict[str, Any]:
     """Executes the complete retrieval and report generation pipeline."""
     pipeline = get_retrieval_pipeline()
-    query = custom_query.strip() or f"Bariery rynkowe, wymóg formatu .str, oprogramowanie EWMAPA, kary umowne: {title}"
-    retrieved_items = pipeline.retrieve(query=query, procurement_id=ocds_id, top_k=5)
+    active_question = (
+        custom_query.strip()
+        or "Czy zamawiający narzuca zamknięty format natywny .str kompatybilny z programem EWMAPA bez udostępnienia struktury pośredniej GML?"
+    )
+    retrieved_items = pipeline.retrieve(query=active_question, procurement_id=ocds_id, top_k=5)
 
     contexts = [
         item["content"] if isinstance(item, dict) else getattr(item, "content", str(item))
@@ -146,7 +161,6 @@ def run_rag_analysis(ocds_id: str, title: str, municipality: str, custom_query: 
     guard = RagasGuard(min_faithfulness=0.95)
     eval_result = guard.evaluate_claims_grounding(report.markdown_report, contexts)
 
-    # Ensure clean structured sections if LLM output missed markdown headings or failed quality gate
     sections = parse_report_sections(report.raw_llm_output)
     if not eval_result.passed or not sections["summary"] or "------" in report.raw_llm_output:
         strict_body = generator._build_grounded_synthesis(merged_context, municipality)
@@ -161,11 +175,15 @@ def run_rag_analysis(ocds_id: str, title: str, municipality: str, custom_query: 
         eval_result = guard.evaluate_claims_grounding(report.markdown_report, contexts)
         sections = parse_report_sections(strict_body)
 
+    direct_answer = generator.answer_specific_question(active_question, merged_context)
+
     return {
         "report": report,
         "evaluation": eval_result,
         "contexts": contexts,
         "sections": sections,
+        "active_question": active_question,
+        "direct_answer": direct_answer,
     }
 
 
@@ -281,7 +299,7 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    # 2. Immediate Interactive Cockpit at the Top (so user functions are immediately visible & accessible)
+    # 2. Interactive RAG Query & Template Cockpit at the Top
     options_map: Dict[str, pd.Series] = {}
     option_labels = []
     for _, row in filtered_df.iterrows():
@@ -291,34 +309,48 @@ def main() -> None:
         options_map[label] = row
         option_labels.append(label)
 
-    col_select, col_mode, col_cta = st.columns([2.4, 1.8, 1.0])
+    col_select, col_template = st.columns([1.15, 1.0])
     with col_select:
-        selected_label = st.selectbox("Wybierz postępowanie do audytu", option_labels, index=0)
-    with col_mode:
-        selected_preset_name = st.selectbox("Zakres analizy AI", list(AUDIT_PRESETS.keys()), index=0)
+        selected_label = st.selectbox("1. Wybierz postępowanie przetargowe", option_labels, index=0)
+    with col_template:
+        template_names = list(RAG_QUESTION_TEMPLATES.keys())
+        selected_template_name = st.selectbox(
+            "2. Wybierz gotowy szablon pytania eksperckiego (lub wpisz własne poniżej)",
+            template_names,
+            index=0,
+        )
+
+    # Sync text input when template dropdown changes, while allowing manual edits at any time
+    template_default_text = RAG_QUESTION_TEMPLATES[selected_template_name]
+    if st.session_state.get("prev_template_name") != selected_template_name:
+        st.session_state["prev_template_name"] = selected_template_name
+        st.session_state["rag_question_input"] = (
+            template_default_text
+            if template_default_text
+            else "Czy zamawiający dopuszcza format otwarty GML zamiast zamkniętego .str i jakie przewidział kary umowne?"
+        )
+
+    col_query_input, col_cta = st.columns([3.2, 1.0])
+    with col_query_input:
+        user_question = st.text_input(
+            "3. Pytanie do dokumentacji SWZ/OPZ (możesz edytować szablon lub wpisać dowolne własne pytanie)",
+            key="rag_question_input",
+        )
     with col_cta:
         st.markdown("<div style='height:28px;'></div>", unsafe_allow_html=True)
-        trigger_btn = st.button("Uruchom audyt SWZ", use_container_width=True)
+        trigger_btn = st.button("Zadaj pytanie i uruchom audyt", use_container_width=True)
 
     selected_row = options_map[selected_label]
     selected_id = str(selected_row["ID"])
-    preset_query = AUDIT_PRESETS[selected_preset_name]
 
-    custom_query = preset_query
-    if selected_preset_name == "Własne pytanie do dokumentacji SWZ":
-        custom_query = st.text_input(
-            "Wpisz własne pytanie analityczne do dokumentacji SWZ/OPZ",
-            value="Czy zamawiający wymaga zamkniętego formatu .str i jakie przewidział kary umowne?",
-        )
-
-    state_key = f"{selected_id}::{selected_preset_name}::{custom_query}"
+    state_key = f"{selected_id}::{user_question}"
     if trigger_btn or st.session_state.get("last_audit_key") != state_key:
-        with st.spinner("Wyszukiwanie hybrydowe w dokumentacji SWZ i weryfikacja wierności RAGAS..."):
+        with st.spinner("Przeszukiwanie hybrydowe SWZ/OPZ i weryfikacja wierności RAGAS..."):
             st.session_state["analysis_result"] = run_rag_analysis(
                 ocds_id=selected_id,
                 title=str(selected_row["Tytuł"]),
                 municipality=str(selected_row["Zamawiający"]),
-                custom_query=custom_query,
+                custom_query=user_question,
             )
             st.session_state["last_audit_key"] = state_key
 
@@ -391,6 +423,15 @@ def main() -> None:
         ])
 
         with tab_audit:
+            # Direct Spotlight Answer to the User's Selected or Custom Question
+            st.markdown(
+                render_direct_answer_card(
+                    question=result.get("active_question", user_question),
+                    answer=result.get("direct_answer", ""),
+                ),
+                unsafe_allow_html=True,
+            )
+
             badges_html = ""
             if has_lockin:
                 badges_html += render_red_flag_badge("vendor_lockin")
@@ -401,7 +442,7 @@ def main() -> None:
 
             st.markdown(render_kio_warning("HIGH" if has_lockin else "LOW"), unsafe_allow_html=True)
 
-            # 2x2 Frosted Glass Insight Grid (replaces the unreadable raw markdown wall)
+            # 2x2 Frosted Glass Insight Grid
             row1_col1, row1_col2 = st.columns(2)
             with row1_col1:
                 st.markdown(

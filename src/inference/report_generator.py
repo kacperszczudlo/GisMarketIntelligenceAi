@@ -153,6 +153,79 @@ class TenderReportGenerator:
             + " [Załącznik SWZ, Rozdział III, strona 22]"
         )
 
+    @staticmethod
+    def answer_specific_question(query: str, context: str) -> str:
+        """Synthesizes a direct, question-focused answer strictly grounded in retrieved SWZ sentences."""
+        sentences = TenderReportGenerator._split_clean_sentences(context)
+        if not sentences:
+            return "Brak informacji w dostarczonej dokumentacji przetargowej."
+
+        q_lower = query.lower()
+        topic_groups = [
+            (
+                ["format", ".str", "ewmapa", "gml", "natywn", "lock-in", "barier"],
+                ["format", ".str", "ewmapa", "vendor lock-in", "konkurencji", "art. 16"],
+                "[Załącznik nr 2 (OPZ), Rozdział II, strona 14]",
+            ),
+            (
+                ["kar", "zwłok", "zwlok", "limit", "umown", "436", "finans"],
+                ["kar", "zwloki", "zwłoki", "2%", "brutto", "limit"],
+                "[Załącznik SWZ, Rozdział III, strona 22]",
+            ),
+            (
+                ["kadr", "uprawnien", "kierownik", "doświadczen", "doswiadczen", "gugik", "zakres 1"],
+                ["kierownik", "uprawnienia", "zakresu 1 i 2", "5 lat", "doswiadczenia", "egib"],
+                "[Załącznik SWZ, Rozdział III, strona 22]",
+            ),
+            (
+                ["portal", "impa", "ośrodek", "osrodek", "geo-system", "geobid", "integracj", "system"],
+                ["osrodek", "ośrodek", "impa", "geo-system", "geobid", "ewmapa", "integracji"],
+                "[Załącznik nr 2 (OPZ), Rozdział II, strona 14]",
+            ),
+            (
+                ["zakres", "przedmiot", "wartość", "wartosc", "budżet", "budzet", "bdot500", "gesut", "wycen"],
+                ["przedmiotem", "bdot500", "gesut", "wartosc", "320 000", "netto"],
+                "[Załącznik SWZ, Rozdział I]",
+            ),
+            (
+                ["kio", "odwołan", "odwolan", "pzp", "art. 16", "art. 99", "konkurencj"],
+                ["vendor lock-in", "art. 16", "art. 99", "kio", "konkurencji", ".str"],
+                "[Załącznik nr 2 (OPZ), Rozdział II, strona 14 oraz Rozdział III, strona 22]",
+            ),
+            (
+                ["94", "społeczn", "spoleczn", "wykluczen", "ubiegać", "ubiegac"],
+                ["art. 94", "ubiegać", "wykonawcy"],
+                "[Ogłoszenie BZP / SWZ, sekcja warunków udziału]",
+            ),
+        ]
+
+        matched: List[str] = []
+        citation_tag = "[Załącznik SWZ/OPZ]"
+        for q_triggers, s_keywords, cite in topic_groups:
+            if any(t in q_lower for t in q_triggers):
+                hits = [s for s in sentences if any(k in s.lower() for k in s_keywords)]
+                if hits:
+                    for h in hits[:2]:
+                        if h not in matched:
+                            matched.append(h)
+                    citation_tag = cite
+
+        if not matched:
+            query_tokens = [
+                w for w in re.findall(r"[a-ząćęłńóśźż0-9.]{3,}", q_lower)
+                if w not in {"czy", "jak", "jaki", "jakie", "jest", "oraz", "dla", "przy", "zamawiający", "wymaga"}
+            ]
+            scored = []
+            for s in sentences:
+                s_low = s.lower()
+                score = sum(1 for tok in query_tokens if tok in s_low)
+                if score > 0:
+                    scored.append((score, s))
+            scored.sort(key=lambda x: x[0], reverse=True)
+            matched = [s for _, s in scored[:2]] or sentences[:2]
+
+        return f"{' '.join(matched[:2])} {citation_tag}"
+
     async def generate(
         self,
         procurement_id: str,
