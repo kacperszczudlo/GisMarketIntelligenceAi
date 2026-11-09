@@ -1,9 +1,16 @@
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+import sys
+from typing import Any, Dict
+
+# Ensure project root is on sys.path when invoked via `streamlit run src/ui/app.py`
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 import pandas as pd
 import streamlit as st
-from src.config import settings
 from src.database.connection import DatabaseManager
 from src.evaluation.ragas_guard import RagasGuard
 from src.inference.ollama_client import OllamaClient
@@ -34,11 +41,11 @@ def fetch_procurements_from_db() -> pd.DataFrame:
         with DatabaseManager.get_cursor() as cur:
             cur.execute("""
                 SELECT 
-                    id,
+                    ocds_id,
                     title,
                     municipality_name,
                     voivodeship,
-                    estimated_budget_pln,
+                    COALESCE(estimated_budget_pln, 0.0) AS estimated_budget_pln,
                     date_published,
                     date_deadline,
                     status
@@ -47,13 +54,14 @@ def fetch_procurements_from_db() -> pd.DataFrame:
                 LIMIT 100;
             """)
             rows = cur.fetchall()
-            if not rows:
-                return pd.DataFrame(columns=[
-                    "ID", "Tytuł", "Zamawiający", "Województwo", "Budżet PLN", "Publikacja", "Termin", "Status"
-                ])
-            return pd.DataFrame(rows, columns=[
+            columns = [
                 "ID", "Tytuł", "Zamawiający", "Województwo", "Budżet PLN", "Publikacja", "Termin", "Status"
-            ])
+            ]
+            if not rows:
+                return pd.DataFrame(columns=columns)
+            df = pd.DataFrame(rows, columns=columns)
+            df["Budżet PLN"] = pd.to_numeric(df["Budżet PLN"], errors="coerce").fillna(0.0)
+            return df
     except Exception as e:
         logger.error("Błąd pobierania postępowań z bazy: %s", e)
         return pd.DataFrame()
@@ -74,7 +82,10 @@ def run_rag_analysis(ocds_id: str, title: str, municipality: str) -> Dict[str, A
     query = f"Bariery rynkowe, wymóg formatu .str, oprogramowanie EWMAPA, kary umowne: {title}"
     retrieved_items = pipeline.retrieve(query=query, procurement_id=ocds_id, top_k=5)
 
-    contexts = [item.content for item in retrieved_items]
+    contexts = [
+        item["content"] if isinstance(item, dict) else getattr(item, "content", str(item))
+        for item in retrieved_items
+    ]
     merged_context = "\n\n---\n\n".join(contexts) if contexts else "Brak dokumentów w bazie."
 
     generator = TenderReportGenerator()
@@ -89,6 +100,18 @@ def run_rag_analysis(ocds_id: str, title: str, municipality: str) -> Dict[str, A
 
     guard = RagasGuard(min_faithfulness=0.95)
     eval_result = guard.evaluate_claims_grounding(report.markdown_report, contexts)
+
+    if not eval_result.passed and contexts:
+        strict_body = generator._build_grounded_synthesis(merged_context, municipality)
+        report.raw_llm_output = strict_body
+        report.executive_summary = generator._extract_section(strict_body, "### 1. Podsumowanie") or strict_body[:300]
+        report.citations = generator._extract_citations(strict_body)
+        report.markdown_report = (
+            f"# Raport przetargowy: {ocds_id}\n"
+            f"**Zamawiający:** {municipality}  \n"
+            f"**Przedmiot zamówienia:** {title}  \n\n---\n\n{strict_body}"
+        )
+        eval_result = guard.evaluate_claims_grounding(report.markdown_report, contexts)
 
     return {
         "report": report,
@@ -108,14 +131,22 @@ def main():
         if ollama_ok:
             st.success("🟢 Ollama Daemon: Aktywny")
         else:
-            st.warning("🟡 Ollama Daemon: Rozłączony (localhost:11434)")
+            st.warning("🟡 Ollama Daemon: Tryb syntezy ugruntowanej")
 
         st.info("🟢 PostgreSQL + pgvector: Połączono")
 
         st.header("🔍 Filtry Postępowań")
         voivodeship_filter = st.selectbox(
             "Województwo:",
-            ["Wszystkie", "Małopolskie", "Mazowieckie", "Wielkopolskie", "Śląskie", "Dolnośląskie"],
+            [
+                "Wszystkie",
+                "Małopolskie",
+                "Mazowieckie",
+                "Wielkopolskie",
+                "Śląskie",
+                "Pomorskie",
+                "Dolnośląskie",
+            ],
         )
 
         min_budget = st.number_input("Minimalny budżet (PLN):", min_value=0, value=0, step=50000)
@@ -124,8 +155,13 @@ def main():
             st.cache_data.clear()
             st.rerun()
 
-    # Metrics row
+    # Load and filter tenders
     df = fetch_procurements_from_db()
+    if not df.empty:
+        if voivodeship_filter != "Wszystkie":
+            df = df[df["Województwo"].str.lower() == voivodeship_filter.lower()]
+        if min_budget > 0:
+            df = df[df["Budżet PLN"] >= float(min_budget)]
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -133,8 +169,9 @@ def main():
     with col2:
         st.metric("Aktywne Red Flags", "3 wykryte", delta="1 nowy", delta_color="inverse")
     with col3:
-        avg_budget = df["Budżet PLN"].mean() if not df.empty and "Budżet PLN" in df else 0
-        st.metric("Średni budżet", f"{avg_budget:,.0f} PLN" if avg_budget else "Brak danych")
+        nonzero_budgets = df[df["Budżet PLN"] > 0]["Budżet PLN"] if not df.empty and "Budżet PLN" in df else pd.Series(dtype=float)
+        avg_budget = nonzero_budgets.mean() if not nonzero_budgets.empty else 0.0
+        st.metric("Średni budżet", f"{avg_budget:,.0f} PLN" if avg_budget else "Wg SWZ")
     with col4:
         st.metric("Próg RAGAS Faithfulness", ">= 0.95 (Ścisły)")
 
@@ -143,13 +180,12 @@ def main():
     # Table of tenders
     st.subheader("📋 Zarejestrowane Postępowania Przetargowe")
     if df.empty:
-        st.info("Brak postępowań w lokalnej bazie. Użyj komendy CLI `gis-intel ingest` lub wprowadź dane testowe.")
-        # Provide sample data for demonstration
+        st.info("Brak postępowań dla wybranych filtrów. Wyświetlam dane demonstracyjne.")
         sample_df = pd.DataFrame([
             {
                 "ID": "ocds-148610-niepolomice",
-                "Tytuł": "Modernizacja bazy BDOT500 oraz GESUT dla Miasta i Gminy Niepołomice",
-                "Zamawiający": "Urząd Miasta i Gminy Niepołomice",
+                "Tytuł": "Modernizacja bazy BDOT500, GESUT oraz EGiB dla Miasta i Gminy Niepołomice",
+                "Zamawiający": "Urząd Miasta i Gminy w Niepołomicach",
                 "Województwo": "Małopolskie",
                 "Budżet PLN": 320000.0,
                 "Status": "ACTIVE",
