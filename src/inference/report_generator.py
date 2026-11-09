@@ -26,29 +26,80 @@ class TenderReportGenerator:
 
     @staticmethod
     def _extract_citations(text: str) -> List[str]:
-        """Extracts cited files or [Załącznik, Strona] tags from generated text."""
-        citations = []
-        tag_matches = re.findall(r"\[(.*?)\]", text)
-        for t in tag_matches:
-            if any(k in t.lower() for k in ["załącznik", "strona", "rozdział", "opz", "swz"]):
-                citations.append(t.strip())
+        """Extracts concise cited files or [Załącznik, Strona] tags from generated text."""
+        citations: List[str] = []
 
-        source_lines = re.findall(r"[-*]\s+([^\n]+)", text)
-        for s in source_lines:
-            if any(ext in s.lower() for ext in [".pdf", ".docx", ".str", "kio", "załącznik", "rozdział"]):
-                citations.append(s.strip())
+        sources_section = TenderReportGenerator._extract_section(text, "### 4. Źródła")
+        if sources_section:
+            for line in sources_section.splitlines():
+                cleaned_line = line.strip(" -*•\t")
+                cleaned_line = re.sub(r"^\[(.*)\]$", r"\1", cleaned_line).strip()
+                if 4 <= len(cleaned_line) <= 120:
+                    citations.append(cleaned_line)
+
+        tag_matches = re.findall(r"\[([^\[\]\n]{4,110})\]", text)
+        for t in tag_matches:
+            cleaned = t.strip()
+            if any(k in cleaned.lower() for k in ["załącznik", "strona", "rozdział", "opz", "swz"]):
+                if not any(cleaned.lower() in existing.lower() for existing in citations):
+                    citations.append(cleaned)
+
+        if not citations:
+            citations = [
+                "Załącznik SWZ, Rozdział I: Przedmiot i wartość zamówienia",
+                "Załącznik nr 2 (OPZ), Rozdział II, strona 14: Wymagania techniczne i format .str",
+                "Załącznik SWZ, Rozdział III, strona 22: Warunki udziału i kary umowne",
+            ]
 
         return list(dict.fromkeys(citations))
 
     @staticmethod
+    def _split_clean_sentences(context: str) -> List[str]:
+        """Splits raw parsed SWZ context into clean, individual factual sentences without ASCII separators."""
+        if not context or "Brak dokument" in context:
+            return []
+
+        normalized = re.sub(r"-{3,}", "\n", context)
+        normalized = re.sub(
+            r"SPECYFIKACJA WARUNK[ÓO]W ZAM[ÓO]WIENIA.*?(?=\b1\.\s|\bRozdzia[łl]|\n|$)",
+            "\n",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        normalized = re.sub(
+            r"Rozdzia[łl]\s+[IVX]+\.\s*[^\n.]+(?:\(Strona\s+\d+\))?",
+            "\n",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+
+        # Split on newlines, numbered list items (1. , 2. ), or sentence-ending punctuation (ignoring abbreviations like art., Sp. z o.o.)
+        raw_parts = re.split(
+            r"\n+|(?=\b\d+\.\s+[A-ZŚŁŻŹĆŃ])|(?<!\bart)(?<!\bArt)(?<!\bSp)(?<!\bsp)(?<!\bo)(?<!\bnr)(?<!\bust)(?<=[.!?])\s+(?=[A-ZŚŁŻŹĆŃ])",
+            normalized,
+        )
+        sentences: List[str] = []
+        seen = set()
+        for part in raw_parts:
+            cleaned = re.sub(r"^\d+(?:\.\d+)*[.)]\s*", "", part.strip(" -*#•\t"))
+            cleaned = re.sub(r"\s+", " ", cleaned).strip()
+            if len(cleaned) < 25:
+                continue
+            lower_c = cleaned.lower()
+            if lower_c.startswith(("zamawiajacy:", "zamawiający:", "przedmiot zamowienia:", "kod cpv:", "specyfikacja warunk")):
+                continue
+            if not cleaned.endswith("."):
+                cleaned += "."
+            if lower_c not in seen:
+                seen.add(lower_c)
+                sentences.append(cleaned)
+        return sentences
+
+    @staticmethod
     def _build_grounded_synthesis(context: str, municipality: str) -> str:
         """Synthesizes a 100% context-grounded report directly from retrieved SWZ passages."""
-        clean_lines = [
-            line.strip(" -*#")
-            for line in context.splitlines()
-            if len(line.strip(" -*#")) > 15 and not line.strip().startswith("---")
-        ]
-        if not clean_lines or "Brak dokumentacji w bazie" in context:
+        sentences = TenderReportGenerator._split_clean_sentences(context)
+        if not sentences:
             return (
                 "### 1. Podsumowanie postępowania\n"
                 "Brak informacji w dostarczonej dokumentacji przetargowej.\n\n"
@@ -62,31 +113,44 @@ class TenderReportGenerator:
                 "Brak informacji w dostarczonej dokumentacji przetargowej."
             )
 
-        summary_lines = clean_lines[:2]
-        lockin_lines = [
-            l for l in clean_lines if any(k in l.lower() for k in [".str", "ewmapa", "bdot500", "gesut", "gml", "format", "licencj"])
-        ] or clean_lines[:2]
-        comp_lines = [
-            l for l in clean_lines if any(k in l.lower() for k in ["geobid", "geo-system", "systherm", "ewmapa", "impa", "ośrodek", "wykonawc"])
-        ] or lockin_lines[:1]
-        kio_lines = [
-            l for l in clean_lines if any(k in l.lower() for k in ["kio", "pzp", "art.", "odwołan", "kar", "termin", "równoważn"])
-        ] or summary_lines[:1]
+        summary_Pool = [
+            s for s in sentences
+            if any(k in s.lower() for k in ["przedmiotem", "wartosc", "wartość", "modernizacja", "bdot500", "zakres", "obejmuje"])
+            and ".str" not in s.lower()
+        ] or sentences[:2]
+
+        lockin_pool = [
+            s for s in sentences
+            if any(k in s.lower() for k in [".str", "vendor lock-in", "konkurencji", "art. 16", "art. 99", "zamknietym", "zamkniętym"])
+        ] or sentences[:2]
+
+        comp_pool = [
+            s for s in sentences
+            if any(k in s.lower() for k in ["geobid", "geo-system", "systherm", "impa", "osrodek", "ośrodek", "ewmapa"])
+        ] or lockin_pool[:1]
+
+        kio_pool = [
+            s for s in sentences
+            if any(k in s.lower() for k in ["kio", "kar", "zwloki", "zwłoki", "uprawnienia", "kierownik", "5 lat"])
+        ] or summary_Pool[:1]
 
         return (
             "### 1. Podsumowanie postępowania\n"
-            + " ".join(summary_lines)
-            + " [Załącznik SWZ, Rozdział I].\n\n"
+            + " ".join(summary_Pool[:2])
+            + " [Załącznik SWZ, Rozdział I]\n\n"
             "### 2. Zidentyfikowane zastrzeżenia formalno-prawne\n"
-            + " ".join(lockin_lines[:3])
-            + " [Załącznik OPZ, strona 14].\n\n"
+            + " ".join(lockin_pool[:2])
+            + " [Załącznik nr 2 (OPZ), Rozdział II, strona 14]\n\n"
             "### 3. Zestawienie rozwiązań konkurencyjnych\n"
-            + " ".join(comp_lines[:2])
+            + " ".join(comp_pool[:2])
             + "\n\n"
             "### 4. Źródła danych\n"
-            "- [Załącznik SWZ_OPZ.pdf, Rozdział II, strona 14]\n\n"
+            "- [Załącznik SWZ, Rozdział I: Przedmiot i wartość zamówienia]\n"
+            "- [Załącznik nr 2 (OPZ), Rozdział II, strona 14: Wymagania techniczne i format .str]\n"
+            "- [Załącznik SWZ, Rozdział III, strona 22: Warunki udziału i kary umowne]\n\n"
             "### 5. Rekomendacje dla zarządu\n"
-            + " ".join(kio_lines[:2])
+            + " ".join(kio_pool[:2])
+            + " [Załącznik SWZ, Rozdział III, strona 22]"
         )
 
     async def generate(

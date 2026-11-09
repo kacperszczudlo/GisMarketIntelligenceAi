@@ -13,7 +13,7 @@ class OllamaClient:
         self,
         base_url: Optional[str] = None,
         model: Optional[str] = None,
-        timeout: float = 15.0,
+        timeout: float = 6.0,
     ) -> None:
         self.base_url = (base_url or settings.OLLAMA_BASE_URL).rstrip("/")
         self.model = model or settings.OLLAMA_MODEL
