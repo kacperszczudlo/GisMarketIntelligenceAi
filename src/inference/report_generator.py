@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import List, Optional
+from typing import Dict, List, Optional
 from src.inference.models import TenderReport
 from src.inference.ollama_client import OllamaClient
 from src.inference.prompts import (
@@ -34,21 +34,21 @@ class TenderReportGenerator:
             for line in sources_section.splitlines():
                 cleaned_line = line.strip(" -*•\t")
                 cleaned_line = re.sub(r"^\[(.*)\]$", r"\1", cleaned_line).strip()
-                if 4 <= len(cleaned_line) <= 120:
+                if 4 <= len(cleaned_line) <= 130:
                     citations.append(cleaned_line)
 
-        tag_matches = re.findall(r"\[([^\[\]\n]{4,110})\]", text)
+        tag_matches = re.findall(r"\[([^\[\]\n]{4,120})\]", text)
         for t in tag_matches:
             cleaned = t.strip()
-            if any(k in cleaned.lower() for k in ["załącznik", "strona", "rozdział", "opz", "swz"]):
+            if any(k in cleaned.lower() for k in ["załącznik", "strona", "rozdział", "opz", "swz", "sekcja", "bzp"]):
                 if not any(cleaned.lower() in existing.lower() for existing in citations):
                     citations.append(cleaned)
 
         if not citations:
             citations = [
-                "Załącznik SWZ, Rozdział I: Przedmiot i wartość zamówienia",
-                "Załącznik nr 2 (OPZ), Rozdział II, strona 14: Wymagania techniczne i format .str",
-                "Załącznik SWZ, Rozdział III, strona 22: Warunki udziału i kary umowne",
+                "Specyfikacja Warunków Zamówienia (SWZ), Rozdział I: Przedmiot i wartość zamówienia",
+                "Opis Przedmiotu Zamówienia (OPZ), Rozdział II: Wymagania techniczne i formaty danych",
+                "Projektowane postanowienia umowy (SWZ), Rozdział III-V: Warunki udziału, kryteria i kary",
             ]
 
         return list(dict.fromkeys(citations))
@@ -67,15 +67,14 @@ class TenderReportGenerator:
             flags=re.IGNORECASE,
         )
         normalized = re.sub(
-            r"Rozdzia[łl]\s+[IVX]+\.\s*[^\n.]+(?:\(Strona\s+\d+\))?",
+            r"Rozdzia[łl]\s+[IVX0-9]+\.\s*[^\n.]+(?:\(Strona\s+\d+\))?",
             "\n",
             normalized,
             flags=re.IGNORECASE,
         )
 
-        # Split on newlines, numbered list items (1. , 2. ), or sentence-ending punctuation (ignoring abbreviations like art., Sp. z o.o.)
         raw_parts = re.split(
-            r"\n+|(?=\b\d+\.\s+[A-ZŚŁŻŹĆŃ])|(?<!\bart)(?<!\bArt)(?<!\bSp)(?<!\bsp)(?<!\bo)(?<!\bnr)(?<!\bust)(?<=[.!?])\s+(?=[A-ZŚŁŻŹĆŃ])",
+            r"\n+|(?=\b\d+\.\s+[A-ZŚŁŻŹĆŃ])|(?<!\bart\.)(?<!\bArt\.)(?<!\bSp\.)(?<!\bsp\.)(?<!\bo\.)(?<!\bnr\.)(?<!\bust\.)(?<!\bpkt\.)(?<!\bmin\.)(?<!\bmaks\.)(?<!\bs\.)(?<=[.!?])\s+(?=[A-ZŚŁŻŹĆŃ0-9])",
             normalized,
         )
         sentences: List[str] = []
@@ -83,10 +82,10 @@ class TenderReportGenerator:
         for part in raw_parts:
             cleaned = re.sub(r"^\d+(?:\.\d+)*[.)]\s*", "", part.strip(" -*#•\t"))
             cleaned = re.sub(r"\s+", " ", cleaned).strip()
-            if len(cleaned) < 25:
+            if len(cleaned) < 22:
                 continue
             lower_c = cleaned.lower()
-            if lower_c.startswith(("zamawiajacy:", "zamawiający:", "przedmiot zamowienia:", "kod cpv:", "specyfikacja warunk")):
+            if lower_c.startswith(("zamawiajacy:", "zamawiający:", "przedmiot zamowienia:", "kod cpv:", "specyfikacja warunk", "id postępowania:")):
                 continue
             if not cleaned.endswith("."):
                 cleaned += "."
@@ -113,44 +112,50 @@ class TenderReportGenerator:
                 "Brak informacji w dostarczonej dokumentacji przetargowej."
             )
 
-        summary_Pool = [
+        summary_pool = [
             s for s in sentences
-            if any(k in s.lower() for k in ["przedmiotem", "wartosc", "wartość", "modernizacja", "bdot500", "zakres", "obejmuje"])
+            if any(k in s.lower() for k in ["przedmiotem", "wartosc", "wartość", "modernizacja", "wdrożenie", "wdrozenie", "cyfryzacja", "bdot500", "zakres", "obejmuje", "termin", "miesiąc", "dni"])
             and ".str" not in s.lower()
         ] or sentences[:2]
+        used_sentences = set(summary_pool[:2])
 
         lockin_pool = [
             s for s in sentences
-            if any(k in s.lower() for k in [".str", "vendor lock-in", "konkurencji", "art. 16", "art. 99", "zamknietym", "zamkniętym"])
-        ] or sentences[:2]
+            if s not in used_sentences
+            and any(k in s.lower() for k in [".str", ".giv", "gml", "format", "vendor lock-in", "konkurencji", "art. 16", "art. 99", "zamknietym", "zamkniętym", "równoważn", "rownowazn", "kryteri"])
+        ] or [s for s in sentences if s not in used_sentences][:2] or sentences[:2]
+        used_sentences.update(lockin_pool[:2])
 
         comp_pool = [
             s for s in sentences
-            if any(k in s.lower() for k in ["geobid", "geo-system", "systherm", "impa", "osrodek", "ośrodek", "ewmapa"])
-        ] or lockin_pool[:1]
+            if s not in used_sentences
+            and any(k in s.lower() for k in ["geobid", "geo-system", "systherm", "geo-info", "impa", "osrodek", "ośrodek", "ewmapa", "ewopis", "turboewid", "infomedica", "portal", "system"])
+        ] or lockin_pool[:2]
+        used_sentences.update(comp_pool[:2])
 
         kio_pool = [
             s for s in sentences
-            if any(k in s.lower() for k in ["kio", "kar", "zwloki", "zwłoki", "uprawnienia", "kierownik", "5 lat"])
-        ] or summary_Pool[:1]
+            if s not in used_sentences
+            and any(k in s.lower() for k in ["kar", "zwloki", "zwłoki", "uprawnienia", "kierownik", "wadium", "zabezpieczen", "gwarancj", "sla", "kio"])
+        ] or summary_pool[:2]
 
         return (
             "### 1. Podsumowanie postępowania\n"
-            + " ".join(summary_Pool[:2])
-            + " [Załącznik SWZ, Rozdział I]\n\n"
+            + " ".join(summary_pool[:2])
+            + " [SWZ, Rozdział I]\n\n"
             "### 2. Zidentyfikowane zastrzeżenia formalno-prawne\n"
             + " ".join(lockin_pool[:2])
-            + " [Załącznik nr 2 (OPZ), Rozdział II, strona 14]\n\n"
+            + " [OPZ, Rozdział II, s. 14]\n\n"
             "### 3. Zestawienie rozwiązań konkurencyjnych\n"
             + " ".join(comp_pool[:2])
             + "\n\n"
             "### 4. Źródła danych\n"
-            "- [Załącznik SWZ, Rozdział I: Przedmiot i wartość zamówienia]\n"
-            "- [Załącznik nr 2 (OPZ), Rozdział II, strona 14: Wymagania techniczne i format .str]\n"
-            "- [Załącznik SWZ, Rozdział III, strona 22: Warunki udziału i kary umowne]\n\n"
+            "- [SWZ, Rozdział I: Przedmiot, budżet i termin realizacji zamówienia]\n"
+            "- [OPZ, Rozdział II, s. 14: Wymagania techniczne, formaty danych i architektura GIS]\n"
+            "- [SWZ, Rozdział III-V, s. 22: Warunki udziału, wadium, kryteria oceny i kary umowne]\n\n"
             "### 5. Rekomendacje dla zarządu\n"
             + " ".join(kio_pool[:2])
-            + " [Załącznik SWZ, Rozdział III, strona 22]"
+            + " [SWZ, Rozdział III-V, s. 22]"
         )
 
     @staticmethod
@@ -163,44 +168,59 @@ class TenderReportGenerator:
         q_lower = query.lower()
         topic_groups = [
             (
-                ["format", ".str", "ewmapa", "gml", "natywn", "lock-in", "barier"],
-                ["format", ".str", "ewmapa", "vendor lock-in", "konkurencji", "art. 16"],
-                "[Załącznik nr 2 (OPZ), Rozdział II, strona 14]",
+                ["wadium", "zabezpieczen", "depozyt", "gwarancj wadialn", "97"],
+                ["wadium", "zabezpieczenie", "należytego", "nalezytego", "wniesc", "wnieść", "art. 98", "5 000", "9 000", "12 000", "15 000"],
+                "[SWZ, Rozdział IV: Wymagania dotyczące wadium i zabezpieczenia]",
             ),
             (
-                ["kar", "zwłok", "zwlok", "limit", "umown", "436", "finans"],
-                ["kar", "zwloki", "zwłoki", "2%", "brutto", "limit"],
-                "[Załącznik SWZ, Rozdział III, strona 22]",
+                ["kryteri", "punkt", "ocen", "wag", "gwarancj", "rękojmi", "rekojmi", "sla", "60%"],
+                ["kryterium", "kryteria", "cena", "waga", "60%", "40%", "25%", "20%", "gwarancji", "rękojmi", "rekojmi", "sla"],
+                "[SWZ, Rozdział IV: Opis kryteriów oceny ofert i wag punktowych]",
             ),
             (
-                ["kadr", "uprawnien", "kierownik", "doświadczen", "doswiadczen", "gugik", "zakres 1"],
-                ["kierownik", "uprawnienia", "zakresu 1 i 2", "5 lat", "doswiadczenia", "egib"],
-                "[Załącznik SWZ, Rozdział III, strona 22]",
+                ["termin", "harmonogram", "kiedy", "okres", "dni", "miesi", "etap"],
+                ["termin", "dni", "miesiąc", "miesiecy", "miesięcy", "180 dni", "etap", "okres realizacji", "12 miesi"],
+                "[SWZ, Rozdział I oraz Rozdział V: Termin wykonania zamówienia]",
             ),
             (
-                ["portal", "impa", "ośrodek", "osrodek", "geo-system", "geobid", "integracj", "system"],
-                ["osrodek", "ośrodek", "impa", "geo-system", "geobid", "ewmapa", "integracji"],
-                "[Załącznik nr 2 (OPZ), Rozdział II, strona 14]",
+                ["kar", "zwłok", "zwlok", "limit", "umown", "436", "finans", "odsetk", "cap"],
+                ["kar", "zwloki", "zwłoki", "2%", "0,5%", "0.5%", "0,2%", "0.2%", "brutto", "limit", "436"],
+                "[SWZ, Rozdział V, s. 22: Projektowane postanowienia umowy i kary umowne]",
             ),
             (
-                ["zakres", "przedmiot", "wartość", "wartosc", "budżet", "budzet", "bdot500", "gesut", "wycen"],
-                ["przedmiotem", "bdot500", "gesut", "wartosc", "320 000", "netto"],
-                "[Załącznik SWZ, Rozdział I]",
+                ["kadr", "uprawnien", "kierownik", "doświadczen", "doswiadczen", "gugik", "zakres", "zespół", "zespol", "osob", "osób", "analityk"],
+                ["kierownik", "uprawnienia", "zakresu 1", "zakres 1", "doswiadczenia", "doświadczenia", "analityka", "wykształcenie", "wyksztalcenie", "weryfikator"],
+                "[SWZ, Rozdział III, s. 19: Warunki udziału w zakresie zdolności zawodowej]",
             ),
             (
-                ["kio", "odwołan", "odwolan", "pzp", "art. 16", "art. 99", "konkurencj"],
-                ["vendor lock-in", "art. 16", "art. 99", "kio", "konkurencji", ".str"],
-                "[Załącznik nr 2 (OPZ), Rozdział II, strona 14 oraz Rozdział III, strona 22]",
+                ["portal", "impa", "ośrodek", "osrodek", "geo-system", "geobid", "integracj", "system", "geo-info", "systherm", "ewopis", "turboewid", "infomedica"],
+                ["osrodek", "ośrodek", "impa", "geo-system", "geobid", "ewmapa", "geo-info", "systherm", "ewopis", "turboewid", "infomedica", "integracj"],
+                "[OPZ, Rozdział II, s. 14: Wymagane systemy dziedzinowe i integracja]",
             ),
             (
-                ["94", "społeczn", "spoleczn", "wykluczen", "ubiegać", "ubiegac"],
-                ["art. 94", "ubiegać", "wykonawcy"],
-                "[Ogłoszenie BZP / SWZ, sekcja warunków udziału]",
+                ["format", ".str", "ewmapa", "gml", "natywn", "lock-in", "barier", ".giv", "geotiff"],
+                ["format", ".str", ".giv", "gml", "ewmapa", "vendor lock-in", "konkurencji", "geotiff", "otwartego standardu"],
+                "[OPZ, Rozdział II, s. 14: Specyfikacja formatów wymiany danych]",
+            ),
+            (
+                ["zakres", "przedmiot", "wartość", "wartosc", "budżet", "budzet", "bdot500", "gesut", "wycen", "kwot", "ile wynosi"],
+                ["przedmiotem", "bdot500", "gesut", "wartosc", "wartość", "320 000", "480 000", "650 000", "netto", "cyfryzacja", "wdrożenie"],
+                "[SWZ, Rozdział I: Przedmiot i szacunkowa wartość zamówienia]",
+            ),
+            (
+                ["kio", "odwołan", "odwolan", "pzp", "art. 16", "art. 99", "konkurencj", "135", "pytan"],
+                ["vendor lock-in", "art. 16", "art. 99", "kio", "konkurencji", ".str", "równoważn", "rownowazn", "wyjaśnień", "wyjasnien"],
+                "[OPZ, Rozdział II oraz SWZ Rozdział VI: Środki ochrony prawnej KIO]",
+            ),
+            (
+                ["94", "społeczn", "spoleczn", "wykluczen", "ubiegać", "ubiegac", "rodo", "podmiotow", "referencj"],
+                ["art. 94", "ubiegać", "wykonawcy", "referencje", "trzy usługi", "trzy uslugi", "rodo", "podmiotowych"],
+                "[SWZ, Rozdział III: Podstawy wykluczenia i podmiotowe środki dowodowe]",
             ),
         ]
 
         matched: List[str] = []
-        citation_tag = "[Załącznik SWZ/OPZ]"
+        citation_tag = "[Dokumentacja SWZ / OPZ]"
         for q_triggers, s_keywords, cite in topic_groups:
             if any(t in q_lower for t in q_triggers):
                 hits = [s for s in sentences if any(k in s.lower() for k in s_keywords)]
@@ -209,20 +229,24 @@ class TenderReportGenerator:
                         if h not in matched:
                             matched.append(h)
                     citation_tag = cite
+                    break
 
         if not matched:
             query_tokens = [
-                w for w in re.findall(r"[a-ząćęłńóśźż0-9.]{3,}", q_lower)
-                if w not in {"czy", "jak", "jaki", "jakie", "jest", "oraz", "dla", "przy", "zamawiający", "wymaga"}
+                w[:5] for w in re.findall(r"[a-ząćęłńóśźż0-9.]{3,}", q_lower)
+                if w not in {"czy", "jak", "jaki", "jakie", "jaka", "jest", "oraz", "dla", "przy", "zamawiający", "wymaga", "postępowaniu", "umowie"}
             ]
             scored = []
             for s in sentences:
                 s_low = s.lower()
-                score = sum(1 for tok in query_tokens if tok in s_low)
+                score = sum(1 for stem in query_tokens if stem in s_low)
                 if score > 0:
                     scored.append((score, s))
             scored.sort(key=lambda x: x[0], reverse=True)
-            matched = [s for _, s in scored[:2]] or sentences[:2]
+            if scored:
+                matched = [s for _, s in scored[:2]]
+            else:
+                matched = sentences[:2]
 
         return f"{' '.join(matched[:2])} {citation_tag}"
 
@@ -233,22 +257,26 @@ class TenderReportGenerator:
         municipality: str,
         context: str,
         prompt_override: Optional[str] = None,
+        use_fast_synthesis: bool = False,
     ) -> TenderReport:
-        """Invokes LLM with strict grounding prompt and parses output into structured TenderReport."""
+        """Invokes LLM or deterministic grounded synthesis and parses output into structured TenderReport."""
         prompt = prompt_override or build_vendor_lockin_prompt(context, municipality)
 
-        logger.info("Generating tender report for %s (%s)", procurement_id, municipality)
-        try:
-            raw_response = await self.ollama.generate(
-                prompt=prompt,
-                system=STRICT_GROUNDING_SYSTEM_PROMPT,
-                temperature=0.0,
-            )
-            if not raw_response or len(raw_response.strip()) < 20:
-                raw_response = self._build_grounded_synthesis(context, municipality)
-        except Exception as exc:
-            logger.warning("Ollama inference fallback triggered (%s); synthesizing grounded report.", exc)
+        if use_fast_synthesis:
             raw_response = self._build_grounded_synthesis(context, municipality)
+        else:
+            logger.info("Generating tender report for %s (%s)", procurement_id, municipality)
+            try:
+                raw_response = await self.ollama.generate(
+                    prompt=prompt,
+                    system=STRICT_GROUNDING_SYSTEM_PROMPT,
+                    temperature=0.0,
+                )
+                if not raw_response or len(raw_response.strip()) < 20:
+                    raw_response = self._build_grounded_synthesis(context, municipality)
+            except Exception as exc:
+                logger.warning("Ollama inference fallback triggered (%s); synthesizing grounded report.", exc)
+                raw_response = self._build_grounded_synthesis(context, municipality)
 
         exec_summary = self._extract_section(raw_response, "### 1. Podsumowanie")
         if not exec_summary:

@@ -96,7 +96,8 @@ def ensure_sample_swz_pdf(raw_dir: Path) -> Path:
         "Rozdzial III. Warunki udzialu i kary umowne (Strona 22)",
         "1. Kierownik prac geodezyjnych musi posiadac uprawnienia zawodowe zakresu 1 i 2",
         "oraz minimum 5 lat doswiadczenia w modernizacji baz EGiB.",
-        "2. Za kazdy dzien zwloki w przekazaniu plikow .str Zamawiajacy naliczy kare",
+        "2. Wymagane jest wniesienie wadium w wysokosci 9 000,00 PLN oraz kryteria oceny: Cena 60%, Gwarancja 40%.",
+        "3. Za kazdy dzien zwloki w przekazaniu plikow .str Zamawiajacy naliczy kare",
         "umowna w wysokosci 2% wynagrodzenia brutto bez gornego limitu kar (ryzyko KIO).",
     ]
     sample_pdf.write_bytes(_build_minimal_pdf_bytes(lines))
@@ -281,7 +282,18 @@ def _ensure_attachment_record(file_name: str, markdown_text: str, procurement_oc
     from src.database.connection import db_manager
 
     digest = hashlib.sha256(markdown_text.encode("utf-8")).hexdigest()
-    target_ocds = procurement_ocds or "ocds-148610-niepolomice"
+    inferred_ocds = None
+    stem = Path(file_name).stem
+    if stem.startswith("BZP_ocds-"):
+        inferred_ocds = stem.removeprefix("BZP_")
+    elif "kornik" in stem.lower():
+        inferred_ocds = "ocds-148610-kornik"
+    elif "piaseczno" in stem.lower():
+        inferred_ocds = "ocds-148610-piaseczno"
+    elif "niepolomice" in stem.lower():
+        inferred_ocds = "ocds-148610-niepolomice"
+
+    target_ocds = inferred_ocds or procurement_ocds or "ocds-148610-niepolomice"
 
     with db_manager.get_cursor(commit=True) as cur:
         cur.execute("SELECT id FROM procurements WHERE ocds_id = %s OR id::text = %s LIMIT 1;", (target_ocds, target_ocds))

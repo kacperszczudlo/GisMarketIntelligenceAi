@@ -105,20 +105,27 @@ def test_rag_question_templates_and_direct_answer():
         "1. Przedmiotem zamowienia jest kompleksowa modernizacja bazy danych BDOT500 oraz inicjalizacja bazy GESUT. "
         "2. Szacunkowa wartosc zamowienia wynosi 320 000,00 PLN netto. "
         "3. Wykonawca zobowiazany jest do przekazania zbiorow w zamknietym formacie natywnym .str kompatybilnym z EWMAPA. "
-        "4. Za kazdy dzien zwloki Zamawiajacy naliczy kare umowna w wysokosci 2% wynagrodzenia brutto bez gornego limitu kar."
+        "4. Za kazdy dzien zwloki Zamawiajacy naliczy kare umowna w wysokosci 2% wynagrodzenia brutto bez gornego limitu kar. "
+        "5. Wykonawca zobowiazany jest wniesc wadium w wysokosci 9 000,00 PLN przed uplywem terminu skladania ofert."
     )
     ans_penalty = TenderReportGenerator.answer_specific_question(
-        RAG_QUESTION_TEMPLATES["2. Kary umowne za zwłokę i brak górnego limitu (art. 436 PZP)"],
+        RAG_QUESTION_TEMPLATES["2. Kary umowne za zwłokę i limit kar (art. 436 PZP)"],
         sample_ctx,
     )
     assert "2%" in ans_penalty
-    assert "Załącznik SWZ" in ans_penalty
+    assert "SWZ" in ans_penalty
+
+    ans_wadium = TenderReportGenerator.answer_specific_question(
+        RAG_QUESTION_TEMPLATES["4. Wadium i zabezpieczenie należytego wykonania umowy"],
+        sample_ctx,
+    )
+    assert "9 000,00 PLN" in ans_wadium
 
     card_html = render_direct_answer_card(
         question="Jakie kary umowne przewidziano?",
         answer=ans_penalty,
     )
-    assert "Bezpośrednia odpowiedź asystenta RAG" in card_html
+    assert "Odpowiedź na zadane pytanie z dokumentacji SWZ / OPZ" in card_html
     assert "2%" in card_html
 
 
@@ -163,7 +170,7 @@ def test_dashboard_layout_components():
         ],
         selected_id="ocds-148610-niepolomice",
     )
-    assert "Postępowania przetargowe w bazie" in table_html
-    assert "W analizie" in table_html
+    assert "Zindeksowane postępowania przetargowe" in table_html
+    assert "Wybrane" in table_html
 
 

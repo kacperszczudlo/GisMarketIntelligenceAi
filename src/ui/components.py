@@ -14,7 +14,7 @@ def get_svg_icon(name: str, size: int = 20, color: str = "currentColor") -> str:
     resolved_size = size if size in allowed_sizes else 20
     icons: Dict[str, str] = {
         "brand-mark": (
-            '<path d="M12 3 4 9l8 6 8-6-8-6Z" fill="rgba(37,99,235,0.18)"></path>'
+            '<path d="M12 3 4 9l8 6 8-6-8-6Z" fill="rgba(37,99,235,0.16)"></path>'
             '<path d="M4 14l8 6 8-6"></path>'
             '<path d="M12 3 4 9l8 6 8-6-8-6Z"></path>'
         ),
@@ -112,199 +112,234 @@ def get_svg_icon(name: str, size: int = 20, color: str = "currentColor") -> str:
     body = icons.get(name, icons["layers"])
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{resolved_size}" height="{resolved_size}" '
-        f'viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" '
+        f'viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="1.9" '
         f'stroke-linecap="round" stroke-linejoin="round" '
         f'style="flex-shrink:0;vertical-align:middle;display:inline-block;">{body}</svg>'
     )
 
 
 def get_glassmorphism_stylesheet() -> str:
-    """Returns a bright, airy Daylight Frosted-Glass SaaS stylesheet with purposeful state transitions."""
+    """Returns a restrained, high-contrast architectural daylight stylesheet (Linear/Stripe register)."""
     return """
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
         :root {
-            --bg-canvas: #f3f6fb;
-            --surface-white: rgba(255, 255, 255, 0.88);
-            --surface-elevated: rgba(255, 255, 255, 0.96);
-            --surface-spotlight: rgba(255, 255, 255, 0.98);
-            --border-subtle: rgba(226, 232, 240, 0.95);
-            --border-focus: #2563eb;
+            --bg-canvas: #f4f6f9;
+            --surface-1: rgba(255, 255, 255, 0.92);
+            --surface-2: #ffffff;
+            --surface-well: #f8fafc;
+            --border-hairline: #e2e8f0;
+            --border-strong: #94a3b8;
             --ink-primary: #0f172a;
-            --ink-secondary: #475569;
+            --ink-secondary: #334155;
             --ink-muted: #64748b;
-            --brand-blue: #2563eb;
-            --brand-coral: #ff6b57;
-            --brand-amber: #f59e0b;
-            --brand-emerald: #10b981;
+            --accent-primary: #0f172a;
+            --accent-interactive: #2563eb;
+            --status-danger: #dc2626;
+            --status-warning: #d97706;
+            --status-success: #059669;
             --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
-            --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
         }
 
-        /* Animations */
         @keyframes cardSlideUp {
-            from {
-                opacity: 0;
-                transform: translateY(12px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         @keyframes barGrowVertical {
-            from {
-                transform: scaleY(0.08);
-            }
-            to {
-                transform: scaleY(1);
-            }
+            from { transform: scaleY(0.05); }
+            to { transform: scaleY(1); }
         }
 
-        @keyframes statusDotPulse {
-            0%, 100% {
-                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45);
-            }
-            50% {
-                box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.0);
-            }
+        /* Hide Streamlit promotional popups, toasts, and toolbar chrome */
+        #MainMenu, footer, [data-testid="stToolbar"], [data-testid="stDecoration"],
+        [data-testid="stNotification"], .stToast, div[data-testid="stStatusWidget"] {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
         }
 
-        /* App Canvas */
+        header[data-testid="stHeader"],
+        div[data-baseweb="toast"],
+        div[role="alertdialog"] {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+        }
+
         .stApp {
             background-color: var(--bg-canvas) !important;
-            background-image:
-                radial-gradient(at 15% 8%, rgba(59, 130, 246, 0.07) 0px, transparent 45%),
-                radial-gradient(at 88% 12%, rgba(16, 185, 129, 0.06) 0px, transparent 42%),
-                radial-gradient(at 50% 90%, rgba(99, 102, 241, 0.05) 0px, transparent 50%) !important;
             color: var(--ink-primary) !important;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
         }
 
-        #MainMenu, footer, [data-testid="stToolbar"] {
-            visibility: hidden;
-            height: 0;
-        }
-        header[data-testid="stHeader"] {
-            background: transparent !important;
-            height: 2rem !important;
-        }
-
         .block-container {
-            padding-top: 1rem !important;
+            padding-top: 0.75rem !important;
             padding-bottom: 3rem !important;
             padding-left: 2rem !important;
             padding-right: 2rem !important;
-            max-width: 1440px !important;
+            max-width: 1460px !important;
         }
 
-        /* Crisp White Sidebar */
+        /* Sidebar Styling */
         [data-testid="stSidebar"] {
             background: #ffffff !important;
-            border-right: 1px solid #e8eef5 !important;
-            box-shadow: 4px 0 24px rgba(15, 23, 42, 0.03) !important;
+            border-right: 1px solid var(--border-hairline) !important;
         }
 
         [data-testid="stSidebar"] > div:first-child {
-            padding-top: 1rem !important;
+            padding-top: 0.75rem !important;
         }
 
-        /* Glass & Card Surfaces (Daylight Frosted) */
+        /* Architectural Surface Layers (Frosted Glass + Crisp Hairline Borders) */
         .glass-layer-1 {
-            background: var(--surface-white);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-            border: 1px solid var(--border-subtle);
-            border-radius: 14px;
-            padding: 18px 20px;
-            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.03);
-            animation: cardSlideUp 320ms var(--ease-out-quint) both;
+            background: var(--surface-1);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-hairline);
+            border-radius: 12px;
+            padding: 16px 18px;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+            animation: cardSlideUp 240ms var(--ease-out-quint) both;
         }
 
         .glass-layer-2 {
-            background: var(--surface-elevated);
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
-            border: 1px solid #e2e8f0;
-            border-radius: 16px;
-            padding: 22px 24px;
-            box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
-            transition: transform 200ms var(--ease-out-quint),
-                        box-shadow 200ms var(--ease-out-quint),
-                        border-color 200ms var(--ease-out-quint);
-            animation: cardSlideUp 360ms var(--ease-out-quint) both;
+            background: var(--surface-2);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-hairline);
+            border-radius: 14px;
+            padding: 20px 22px;
+            box-shadow: 0 2px 8px -2px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.03);
+            transition: transform 180ms var(--ease-out-quint), box-shadow 180ms var(--ease-out-quint), border-color 180ms var(--ease-out-quint);
+            animation: cardSlideUp 280ms var(--ease-out-quint) both;
         }
 
         .glass-layer-2:hover {
-            transform: translateY(-3px);
             border-color: #cbd5e1;
-            box-shadow: 0 12px 28px -4px rgba(15, 23, 42, 0.08), 0 4px 10px -2px rgba(37, 99, 235, 0.05);
+            box-shadow: 0 8px 20px -4px rgba(15, 23, 42, 0.07);
         }
 
         .glass-layer-3 {
-            background: var(--surface-spotlight);
+            background: #ffffff;
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(37, 99, 235, 0.28);
-            border-radius: 16px;
-            padding: 22px 24px;
-            box-shadow: 0 10px 30px -4px rgba(37, 99, 235, 0.10), 0 4px 12px rgba(15, 23, 42, 0.04);
-            transition: transform 200ms var(--ease-out-quint), box-shadow 200ms var(--ease-out-quint);
-            animation: cardSlideUp 380ms var(--ease-out-quint) both;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 14px;
+            padding: 20px 22px;
+            box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.06);
+            animation: cardSlideUp 300ms var(--ease-out-quint) both;
         }
 
-        /* Form Controls & Selectboxes */
-        div[data-baseweb="select"] > div,
+        /* HIGH-VISIBILITY SELECTBOXES & INPUTS (Fixes 'listy rozwijalne sa malo widoczne') */
+        div[data-baseweb="select"] > div {
+            min-height: 44px !important;
+            background-color: #ffffff !important;
+            border: 1.5px solid #64748b !important;
+            border-radius: 10px !important;
+            color: #0f172a !important;
+            font-weight: 600 !important;
+            font-size: 0.88rem !important;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
+            transition: all 150ms ease !important;
+            cursor: pointer !important;
+        }
+
+        div[data-baseweb="select"] > div:hover {
+            border-color: #2563eb !important;
+            background-color: #f8fafc !important;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12) !important;
+        }
+
+        div[data-baseweb="select"] > div:focus-within {
+            border-color: #2563eb !important;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18) !important;
+        }
+
+        div[data-baseweb="select"] svg {
+            fill: #0f172a !important;
+            color: #0f172a !important;
+            width: 20px !important;
+            height: 20px !important;
+        }
+
+        /* Dropdown Popover Menu Portal (Forces Crisp White Menu & Readable Options even if Browser is Dark Mode) */
+        div[data-baseweb="popover"],
+        div[data-baseweb="menu"],
+        ul[role="listbox"] {
+            background-color: #ffffff !important;
+            border: 1.5px solid #94a3b8 !important;
+            border-radius: 10px !important;
+            box-shadow: 0 14px 32px rgba(15, 23, 42, 0.16) !important;
+            color: #0f172a !important;
+        }
+
+        li[role="option"] {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            font-weight: 500 !important;
+            font-size: 0.88rem !important;
+            padding: 10px 14px !important;
+            border-bottom: 1px solid #f1f5f9 !important;
+        }
+
+        li[role="option"]:hover,
+        li[role="option"][aria-selected="true"] {
+            background-color: #eff6ff !important;
+            color: #1d4ed8 !important;
+            font-weight: 700 !important;
+        }
+
+        /* Text Input Field */
         div[data-baseweb="input"] > div {
             min-height: 44px !important;
             background-color: #ffffff !important;
-            border: 1px solid #dbe3ee !important;
+            border: 1.5px solid #64748b !important;
             border-radius: 10px !important;
             color: #0f172a !important;
-            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03) !important;
-            transition: border-color 160ms var(--ease-out-quart), box-shadow 160ms var(--ease-out-quart) !important;
+            font-weight: 500 !important;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05) !important;
         }
 
-        div[data-baseweb="select"] > div:hover,
-        div[data-baseweb="input"] > div:hover {
-            border-color: #94a3b8 !important;
-        }
-
-        div[data-baseweb="select"] > div:focus-within,
         div[data-baseweb="input"] > div:focus-within {
             border-color: #2563eb !important;
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14) !important;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16) !important;
+        }
+
+        div[data-baseweb="input"] input {
+            color: #0f172a !important;
+            font-size: 0.9rem !important;
+            font-weight: 500 !important;
         }
 
         .stSelectbox label, .stTextInput label, .stNumberInput label {
-            color: #334155 !important;
-            font-weight: 600 !important;
-            font-size: 0.82rem !important;
+            color: #0f172a !important;
+            font-weight: 700 !important;
+            font-size: 0.8rem !important;
+            letter-spacing: -0.01em !important;
             margin-bottom: 4px !important;
         }
 
-        /* Clean Primary Action Button (Matches the clean blue button in the inspiration UI) */
+        /* Buttons: Restrained Deep Slate Primary & Crisp Secondary Pills */
         .stButton > button {
             min-height: 44px !important;
-            background: #2563eb !important;
+            background: #0f172a !important;
             color: #ffffff !important;
-            border: 1px solid #1d4ed8 !important;
+            border: 1px solid #0f172a !important;
             border-radius: 10px !important;
             padding: 0.5rem 1.25rem !important;
             font-weight: 600 !important;
-            font-size: 0.875rem !important;
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.22) !important;
-            transition: transform 150ms var(--ease-out-quint),
-                        background-color 150ms var(--ease-out-quint),
-                        box-shadow 150ms var(--ease-out-quint) !important;
+            font-size: 0.86rem !important;
+            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.14) !important;
+            transition: all 150ms var(--ease-out-quint) !important;
         }
 
         .stButton > button:hover {
-            background: #1d4ed8 !important;
+            background: #1e293b !important;
+            border-color: #1e293b !important;
             transform: translateY(-1px) !important;
-            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.30) !important;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.22) !important;
         }
 
         .stButton > button:active {
@@ -312,62 +347,28 @@ def get_glassmorphism_stylesheet() -> str:
         }
 
         .stDownloadButton > button {
-            min-height: 42px !important;
+            min-height: 40px !important;
             background: #ffffff !important;
-            color: #1e293b !important;
-            border: 1px solid #cbd5e1 !important;
-            border-radius: 10px !important;
+            color: #0f172a !important;
+            border: 1.5px solid #cbd5e1 !important;
+            border-radius: 9px !important;
             font-weight: 600 !important;
-            font-size: 0.84rem !important;
-            transition: all 150ms var(--ease-out-quart) !important;
+            font-size: 0.82rem !important;
         }
 
         .stDownloadButton > button:hover {
+            border-color: #0f172a !important;
             background: #f8fafc !important;
-            border-color: #2563eb !important;
-            color: #2563eb !important;
         }
 
-        /* Pill Tabs (Matches the clean green/white pill tabs in the inspiration image) */
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 6px;
-            background: #ffffff;
-            padding: 5px;
-            border-radius: 12px;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.02);
-        }
-
-        .stTabs [data-baseweb="tab"] {
-            min-height: 38px;
-            padding: 6px 16px;
-            border-radius: 8px;
-            color: #64748b !important;
-            font-weight: 600;
-            font-size: 0.84rem;
-            border: none !important;
-            transition: all 180ms var(--ease-out-quart);
-        }
-
-        .stTabs [aria-selected="true"] {
-            background: #10b981 !important;
-            color: #ffffff !important;
-            box-shadow: 0 3px 10px rgba(16, 185, 129, 0.25);
-        }
-
-        .stTabs [data-baseweb="tab-panel"] {
-            animation: cardSlideUp 260ms var(--ease-out-quint) both;
-            padding-top: 16px !important;
-        }
-
-        /* Chips & Domain Highlights */
+        /* Chips */
         .glass-chip {
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            padding: 4px 11px;
-            border-radius: 999px;
-            font-size: 0.78rem;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.76rem;
             font-weight: 600;
             background: #f1f5f9;
             border: 1px solid #e2e8f0;
@@ -377,20 +378,19 @@ def get_glassmorphism_stylesheet() -> str:
         }
 
         .highlight-term {
-            background: #eff6ff;
-            color: #1d4ed8;
-            border: 1px solid #bfdbfe;
+            background: #f1f5f9;
+            color: #0f172a;
+            border: 1px solid #cbd5e1;
             padding: 1px 6px;
-            border-radius: 5px;
+            border-radius: 4px;
             font-weight: 600;
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.86em;
+            font-size: 0.84em;
         }
 
-        /* Animated vertical chart bars */
         .v-bar-fill {
             transform-origin: bottom;
-            animation: barGrowVertical 650ms var(--ease-out-quint) both;
+            animation: barGrowVertical 500ms var(--ease-out-quint) both;
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -405,15 +405,15 @@ def get_glassmorphism_stylesheet() -> str:
 
 def render_brand_sidebar_header() -> str:
     """Renders the compact geometric logo and app title in the top-left of the sidebar."""
-    logo_svg = get_svg_icon("brand-mark", size=24, color="#2563eb")
+    logo_svg = get_svg_icon("brand-mark", size=24, color="#0f172a")
     return _compact_html(f"""
-    <div style="display:flex;align-items:center;gap:12px;padding:4px 4px 20px 4px;border-bottom:1px solid #f1f5f9;margin-bottom:18px;">
-        <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border:1px solid #bfdbfe;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(37,99,235,0.12);">
+    <div style="display:flex;align-items:center;gap:12px;padding:4px 4px 16px 4px;border-bottom:1px solid #e2e8f0;margin-bottom:16px;">
+        <div style="width:40px;height:40px;border-radius:10px;background:#f8fafc;border:1.5px solid #cbd5e1;display:flex;align-items:center;justify-content:center;">
             {logo_svg}
         </div>
         <div>
-            <div style="font-size:1.02rem;font-weight:800;color:#0f172a;letter-spacing:-0.02em;line-height:1.15;">GisMarket</div>
-            <div style="font-size:0.74rem;font-weight:600;color:#64748b;letter-spacing:0.01em;">Intelligence AI</div>
+            <div style="font-size:0.98rem;font-weight:800;color:#0f172a;letter-spacing:-0.02em;line-height:1.15;">GisMarket</div>
+            <div style="font-size:0.72rem;font-weight:600;color:#64748b;">Intelligence AI</div>
         </div>
     </div>
     """)
@@ -427,38 +427,38 @@ def render_top_utility_bar(
     has_lockin: bool,
 ) -> str:
     """Renders a clean top navbar with breadcrumbs on the left and status pills on the right."""
-    home_svg = get_svg_icon("home", size=16, color="#2563eb")
-    bell_svg = get_svg_icon("bell", size=16, color="#f59e0b" if has_lockin else "#10b981")
+    home_svg = get_svg_icon("home", size=16, color="#475569")
     safe_muni = html.escape(municipality)
     safe_voiv = html.escape(voivodeship)
 
-    alert_text = (
-        'Wykryto <strong style="color:#dc2626;">2 ryzyka KIO</strong> w SWZ'
+    status_badge = (
+        '<span style="display:inline-flex;align-items:center;gap:6px;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;padding:5px 12px;border-radius:999px;font-size:0.76rem;font-weight:700;">'
+        '<span style="width:6px;height:6px;border-radius:50%;background:#dc2626;display:inline-block;"></span>'
+        'Wykryto bariery SWZ</span>'
         if has_lockin
-        else 'Dokumentacja <strong style="color:#10b981;">zgodna z PZP</strong>'
+        else '<span style="display:inline-flex;align-items:center;gap:6px;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;padding:5px 12px;border-radius:999px;font-size:0.76rem;font-weight:700;">'
+        '<span style="width:6px;height:6px;border-radius:50%;background:#059669;display:inline-block;"></span>'
+        'Zgodność z PZP</span>'
     )
-    dot_color = "#10b981" if ollama_ok else "#f59e0b"
-    env_label = "Ollama AI + pgvector" if ollama_ok else "Tryb deterministyczny + pgvector"
+    dot_color = "#059669" if ollama_ok else "#d97706"
+    env_label = "Silnik hybrydowy BGE-M3 + pgvector"
 
     return _compact_html(f"""
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;padding:6px 2px;">
-        <div style="display:flex;align-items:center;gap:8px;font-size:0.86rem;color:#64748b;font-weight:500;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px;padding:4px 0;">
+        <div style="display:flex;align-items:center;gap:8px;font-size:0.84rem;color:#64748b;font-weight:500;">
             {home_svg}
-            <span>Panel główny</span>
-            <span style="color:#cbd5e1;">&rsaquo;</span>
-            <span>Audyt zamówień GIS</span>
-            <span style="color:#cbd5e1;">&rsaquo;</span>
-            <span style="color:#0f172a;font-weight:700;">{safe_muni} ({safe_voiv})</span>
+            <span>Audyt zamówień publicznych</span>
+            <span style="color:#cbd5e1;">/</span>
+            <span>{safe_voiv}</span>
+            <span style="color:#cbd5e1;">/</span>
+            <span style="color:#0f172a;font-weight:700;">{safe_muni}</span>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <div style="display:inline-flex;align-items:center;gap:8px;background:#ffffff;border:1px solid #e2e8f0;padding:7px 14px;border-radius:999px;font-size:0.8rem;color:#334155;box-shadow:0 2px 6px rgba(15,23,42,0.03);">
-                <span>{alert_text}</span>
-                {bell_svg}
-            </div>
-            <div style="display:inline-flex;align-items:center;gap:8px;background:#ffffff;border:1px solid #e2e8f0;padding:7px 14px;border-radius:999px;font-size:0.8rem;color:#0f172a;font-weight:600;box-shadow:0 2px 6px rgba(15,23,42,0.03);">
-                <span style="width:8px;height:8px;border-radius:50%;background:{dot_color};animation:statusDotPulse 2.4s infinite;display:inline-block;"></span>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            {status_badge}
+            <div style="display:inline-flex;align-items:center;gap:8px;background:#ffffff;border:1px solid #cbd5e1;padding:5px 12px;border-radius:999px;font-size:0.76rem;color:#334155;font-weight:600;">
+                <span style="width:7px;height:7px;border-radius:50%;background:{dot_color};display:inline-block;"></span>
                 <span>{env_label}</span>
-                <span style="background:#eff6ff;color:#2563eb;padding:1px 7px;border-radius:999px;font-size:0.72rem;font-weight:700;">{total_tenders} SWZ</span>
+                <span style="background:#f1f5f9;color:#0f172a;padding:1px 7px;border-radius:999px;font-size:0.72rem;font-weight:700;">{total_tenders} SWZ</span>
             </div>
         </div>
     </div>
@@ -470,87 +470,101 @@ def render_kpi_stat_card(
     label: str,
     sublabel: str,
     icon_name: str,
-    color_hex: str,
-    ring_bg: str,
+    color_hex: str = "#0f172a",
+    ring_bg: str = "#f1f5f9",
     stagger_index: int = 0,
 ) -> str:
-    """Renders a clean horizontal KPI card with a circular colored icon badge (inspired by modern SaaS dashboards)."""
-    svg = get_svg_icon(icon_name, size=24, color="#ffffff")
-    delay_ms = stagger_index * 55
+    """Renders a restrained, high-contrast executive KPI card without rainbow AI clichés."""
+    svg = get_svg_icon(icon_name, size=20, color=color_hex)
+    delay_ms = stagger_index * 40
     return _compact_html(f"""
-    <div class="glass-layer-2" style="padding:20px 22px;display:flex;align-items:center;gap:18px;animation-delay:{delay_ms}ms;">
-        <div style="width:54px;height:54px;border-radius:50%;background:{color_hex};box-shadow:0 0 0 6px {ring_bg}, 0 6px 16px {ring_bg};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            {svg}
-        </div>
+    <div class="glass-layer-2" style="padding:16px 18px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;animation-delay:{delay_ms}ms;">
         <div style="min-width:0;">
-            <div style="font-size:1.55rem;font-weight:800;color:{color_hex};line-height:1.15;letter-spacing:-0.025em;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                {html.escape(value)}
-            </div>
-            <div style="font-size:0.84rem;font-weight:700;color:#1e293b;margin-top:3px;">
+            <div style="font-size:0.76rem;font-weight:600;color:#64748b;margin-bottom:4px;">
                 {html.escape(label)}
             </div>
-            <div style="font-size:0.74rem;color:#64748b;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            <div style="font-size:1.4rem;font-weight:800;color:{color_hex};line-height:1.15;letter-spacing:-0.025em;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                {html.escape(value)}
+            </div>
+            <div style="font-size:0.74rem;color:#475569;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                 {html.escape(sublabel)}
             </div>
+        </div>
+        <div style="width:38px;height:38px;border-radius:9px;background:{ring_bg};border:1px solid #e2e8f0;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            {svg}
         </div>
     </div>
     """)
 
 
-def render_risk_profile_panel(has_lockin: bool, has_penalties: bool, faithfulness: float) -> str:
-    """Renders the right-hand vertical bar chart card with an overall score summary at the bottom."""
-    b1 = 92 if has_lockin else 22
-    b2 = 86 if has_penalties else 28
-    b3 = 64
+def render_risk_profile_panel(
+    has_lockin: bool,
+    has_penalties: bool,
+    faithfulness: float,
+    format_score: int = 92,
+    penalty_score: int = 86,
+    personnel_score: int = 64,
+    system_tags: List[str] | None = None,
+) -> str:
+    """Renders a clean, restrained architectural bar chart card with an overall score summary."""
+    b1 = format_score
+    b2 = penalty_score
+    b3 = personnel_score
     b4 = int(round(faithfulness * 100))
     overall_score = int(round((b1 + b2 + b3) / 3))
 
     bars = [
-        ("Format", b1, "#3b82f6"),
-        ("Kary", b2, "#6366f1"),
-        ("Kadra", b3, "#8b5cf6"),
-        ("RAGAS", b4, "#10b981"),
+        ("Format", b1, "#0f172a" if b1 < 70 else "#dc2626"),
+        ("Kary", b2, "#334155" if b2 < 70 else "#d97706"),
+        ("Kadra", b3, "#475569"),
+        ("RAGAS", b4, "#059669"),
     ]
     bars_html = ""
     for idx, (lbl, pct, col) in enumerate(bars):
-        delay = idx * 80
+        delay = idx * 60
         bars_html += (
-            f"<div style='display:flex;flex-direction:column;align-items:center;gap:8px;flex:1;'>"
-            f"<div style='height:150px;width:28px;background:#f1f5f9;border-radius:8px;display:flex;align-items:flex-end;overflow:hidden;padding:2px;'>"
-            f"<div class='v-bar-fill' style='width:100%;height:{pct}%;background:{col};border-radius:6px;animation-delay:{delay}ms;'></div>"
+            f"<div style='display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;'>"
+            f"<div style='height:128px;width:26px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;display:flex;align-items:flex-end;overflow:hidden;padding:2px;'>"
+            f"<div class='v-bar-fill' style='width:100%;height:{pct}%;background:{col};border-radius:4px;animation-delay:{delay}ms;'></div>"
             f"</div>"
-            f"<span style='font-size:0.75rem;font-weight:600;color:#64748b;'>{lbl}</span>"
+            f"<span style='font-size:0.74rem;font-weight:600;color:#475569;'>{lbl}</span>"
             f"<span style='font-size:0.72rem;font-weight:700;color:#0f172a;font-variant-numeric:tabular-nums;'>{pct}%</span>"
             f"</div>"
         )
 
-    verdict_note = (
-        "Wysoki poziom restrykcyjności SWZ (wymagany wniosek z art. 135 PZP)"
-        if has_lockin
-        else "Standardowy profil wymagań przetargowych"
+    if overall_score >= 70:
+        verdict_note = "Wysoka restrykcyjność SWZ — rekomendowany wniosek z art. 135 PZP"
+    elif overall_score >= 45:
+        verdict_note = "Umiarkowana restrykcyjność — weryfikacja równoważności GML"
+    else:
+        verdict_note = "Niska restrykcyjność — dokumentacja zgodna ze standardem GML"
+
+    tags = system_tags or ["EWMAPA (.str)", "iMPA / OŚRODEK"]
+    tags_html = "".join(
+        f"<span class='glass-chip' style='background:#f8fafc;color:#0f172a;border-color:#cbd5e1;'>{html.escape(t)}</span>"
+        for t in tags
     )
 
     return _compact_html(f"""
-    <div class="glass-layer-2" style="height:100%;display:flex;flex-direction:column;justify-content:space-between;">
+    <div class="glass-layer-2" style="display:flex;flex-direction:column;justify-content:space-between;">
         <div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
-                <span style="font-size:1.02rem;font-weight:800;color:#0f172a;">Profil ryzyka SWZ</span>
-                <span style="font-size:0.74rem;font-weight:700;color:#2563eb;background:#eff6ff;padding:4px 10px;border-radius:999px;">Indeks barier</span>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                <span style="font-size:0.95rem;font-weight:800;color:#0f172a;">Profil ryzyka SWZ</span>
+                <span style="font-size:0.72rem;font-weight:700;color:#334155;background:#f1f5f9;border:1px solid #e2e8f0;padding:3px 9px;border-radius:6px;">Indeks barier</span>
             </div>
-            <div style="display:flex;justify-content:space-around;align-items:flex-end;gap:12px;padding:14px 8px 18px 8px;border-bottom:1px solid #f1f5f9;">
+            <div style="display:flex;justify-content:space-around;align-items:flex-end;gap:10px;padding:10px 4px 14px 4px;border-bottom:1px solid #f1f5f9;">
                 {bars_html}
             </div>
         </div>
-        <div style="text-align:center;padding-top:18px;">
-            <div style="font-size:2.1rem;font-weight:800;color:#0f172a;letter-spacing:-0.03em;line-height:1.1;font-variant-numeric:tabular-nums;">
-                {overall_score} <span style="font-size:1rem;font-weight:600;color:#94a3b8;">/ 100</span>
+        <div style="text-align:center;padding-top:14px;">
+            <div style="font-size:1.85rem;font-weight:800;color:#0f172a;letter-spacing:-0.03em;line-height:1.1;font-variant-numeric:tabular-nums;">
+                {overall_score} <span style="font-size:0.92rem;font-weight:600;color:#64748b;">/ 100</span>
             </div>
-            <div style="font-size:0.8rem;color:#64748b;margin-top:6px;line-height:1.4;">
+            <div style="font-size:0.78rem;color:#475569;margin-top:4px;line-height:1.4;">
                 {verdict_note}
             </div>
-            <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:14px;">
-                <span class="glass-chip" style="background:#fff1f2;color:#e11d48;border-color:#fecdd3;">Geobid: EWMAPA (.str)</span>
-                <span class="glass-chip" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe;">Geo-System: iMPA</span>
+            <div style="display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:10px;">
+                {tags_html}
             </div>
         </div>
     </div>
@@ -562,26 +576,26 @@ def render_red_flag_badge(flag_type: str) -> str:
     configs: Dict[str, Dict[str, str]] = {
         "vendor_lockin": {
             "label": "Vendor Lock-in (.str / EWMAPA)",
-            "bg": "#fff1f2",
-            "border": "#fecdd3",
-            "color": "#be123c",
-            "icon_color": "#e11d48",
+            "bg": "#fef2f2",
+            "border": "#fecaca",
+            "color": "#991b1b",
+            "icon_color": "#dc2626",
             "icon": "shield-alert",
         },
         "asymetria_kar": {
-            "label": "Asymetria kar umownych (2% dziennie bez limitu)",
+            "label": "Asymetria kar umownych (brak górnego limitu)",
             "bg": "#fffbeb",
             "border": "#fde68a",
-            "color": "#b45309",
+            "color": "#92400e",
             "icon_color": "#d97706",
             "icon": "scale",
         },
         "krotki_termin": {
-            "label": "Krótki termin realizacji zamówienia",
-            "bg": "#f5f3ff",
-            "border": "#ddd6fe",
-            "color": "#6d28d9",
-            "icon_color": "#7c3aed",
+            "label": "Napięty harmonogram realizacji",
+            "bg": "#f8fafc",
+            "border": "#cbd5e1",
+            "color": "#1e293b",
+            "icon_color": "#475569",
             "icon": "layers",
         },
     }
@@ -590,7 +604,7 @@ def render_red_flag_badge(flag_type: str) -> str:
         flag_type.lower(),
         {
             "label": f"Ryzyko SWZ: {flag_type}",
-            "bg": "#f1f5f9",
+            "bg": "#f8fafc",
             "border": "#cbd5e1",
             "color": "#334155",
             "icon_color": "#475569",
@@ -600,7 +614,7 @@ def render_red_flag_badge(flag_type: str) -> str:
 
     svg = get_svg_icon(cfg["icon"], size=16, color=cfg["icon_color"])
     return _compact_html(f"""
-    <span style="display:inline-flex;align-items:center;gap:7px;background-color:{cfg['bg']};color:{cfg['color']};border:1px solid {cfg['border']};padding:6px 13px;border-radius:999px;font-weight:600;font-size:0.8rem;margin-right:8px;margin-bottom:6px;">
+    <span style="display:inline-flex;align-items:center;gap:6px;background-color:{cfg['bg']};color:{cfg['color']};border:1px solid {cfg['border']};padding:5px 11px;border-radius:6px;font-weight:600;font-size:0.78rem;margin-right:8px;margin-bottom:6px;">
         {svg}
         <span>{cfg['label']}</span>
     </span>
@@ -610,20 +624,20 @@ def render_red_flag_badge(flag_type: str) -> str:
 def render_citation_box(citation_text: str) -> str:
     """Renders a concise verified SWZ/OPZ document reference pill."""
     escaped = html.escape(citation_text.strip(" []"))
-    svg = get_svg_icon("file-check", size=20, color="#2563eb")
+    svg = get_svg_icon("file-check", size=16, color="#475569")
     return _compact_html(f"""
-    <div class="glass-layer-1" style="padding:12px 16px;margin:8px 0;display:flex;align-items:center;gap:12px;border-radius:12px;">
+    <div class="glass-layer-1" style="padding:10px 14px;margin:6px 0;display:flex;align-items:center;gap:10px;border-radius:8px;background:#f8fafc;">
         {svg}
-        <div style="font-size:0.86rem;line-height:1.45;color:#1e293b;">
-            <span style="color:#2563eb;font-weight:700;margin-right:6px;">Źródło dowodowe SWZ/OPZ:</span>
-            <span style="color:#334155;font-family:'JetBrains Mono',monospace;font-size:0.82rem;">{escaped}</span>
+        <div style="font-size:0.82rem;line-height:1.4;color:#1e293b;">
+            <span style="color:#475569;font-weight:700;margin-right:6px;">Źródło dowodowe SWZ/OPZ:</span>
+            <span style="color:#0f172a;font-family:'JetBrains Mono',monospace;font-size:0.79rem;">{escaped}</span>
         </div>
     </div>
     """)
 
 
 def render_competitor_matrix(competitors: List[Dict[str, str]]) -> str:
-    """Renders a clean light-mode table displaying regional GIS competitors."""
+    """Renders a clean architectural table displaying regional GIS competitors."""
     if not competitors:
         return "<div class='glass-layer-1'>Brak zidentyfikowanych podmiotów konkurencyjnych.</div>"
 
@@ -634,20 +648,20 @@ def render_competitor_matrix(competitors: List[Dict[str, str]]) -> str:
         advantage = html.escape(comp.get("advantage", "-"))
         rows_html += (
             f"<tr style='border-bottom:1px solid #f1f5f9;'>"
-            f"<td style='padding:13px 16px;font-weight:700;color:#0f172a;'>{name}</td>"
-            f"<td style='padding:13px 16px;'><span style='background:#eff6ff;color:#2563eb;padding:3px 9px;border-radius:6px;font-family:\"JetBrains Mono\",monospace;font-size:0.8rem;font-weight:600;'>{product}</span></td>"
-            f"<td style='padding:13px 16px;color:#475569;'>{advantage}</td>"
+            f"<td style='padding:11px 14px;font-weight:700;color:#0f172a;font-size:0.84rem;'>{name}</td>"
+            f"<td style='padding:11px 14px;'><span style='background:#f1f5f9;color:#0f172a;border:1px solid #cbd5e1;padding:2px 8px;border-radius:5px;font-family:\"JetBrains Mono\",monospace;font-size:0.76rem;font-weight:600;'>{product}</span></td>"
+            f"<td style='padding:11px 14px;color:#334155;font-size:0.83rem;'>{advantage}</td>"
             f"</tr>"
         )
 
     return _compact_html(f"""
     <div class="glass-layer-2" style="padding:0;overflow:hidden;margin:8px 0;">
-        <table style="width:100%;border-collapse:collapse;font-size:0.88rem;text-align:left;">
+        <table style="width:100%;border-collapse:collapse;text-align:left;">
             <thead>
-                <tr style="background:#f8fafc;color:#64748b;border-bottom:1px solid #e2e8f0;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.04em;">
-                    <th style="padding:12px 16px;">Podmiot konkurencyjny</th>
-                    <th style="padding:12px 16px;">System bazodanowy GIS</th>
-                    <th style="padding:12px 16px;">Przewaga w postępowaniu</th>
+                <tr style="background:#f8fafc;color:#475569;border-bottom:1px solid #e2e8f0;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.04em;">
+                    <th style="padding:10px 14px;">Podmiot / Technologia</th>
+                    <th style="padding:10px 14px;">System bazodanowy</th>
+                    <th style="padding:10px 14px;">Pozycja w postępowaniu</th>
                 </tr>
             </thead>
             <tbody>{rows_html}</tbody>
@@ -660,27 +674,27 @@ def render_kio_warning(risk_level: str) -> str:
     """Renders a clean semantic alert indicating KIO appeal grounds."""
     level = risk_level.upper()
     if level == "HIGH":
-        bg = "#fff1f2"
-        border = "#fecdd3"
-        color = "#9f1239"
-        icon_color = "#e11d48"
-        text = "Ryzyko odwołania do KIO: WYSOKIE (podstawa prawna: art. 16 oraz art. 99 ustawy PZP)"
+        bg = "#fef2f2"
+        border = "#fecaca"
+        color = "#991b1b"
+        icon_color = "#dc2626"
+        text = "Ryzyko odwołania do KIO: WYSOKIE (podstawa prawna: art. 16 oraz art. 99 ust. 4 ustawy PZP)"
     elif level == "MEDIUM":
         bg = "#fffbeb"
         border = "#fde68a"
         color = "#92400e"
         icon_color = "#d97706"
-        text = "Ryzyko odwołania do KIO: ŚREDNIE (zalecane pytanie o równoważność formatów GML/GeoTIFF)"
+        text = "Ryzyko odwołania do KIO: ŚREDNIE (zalecany wniosek z art. 135 PZP o równoważność konektora GML)"
     else:
         bg = "#ecfdf5"
         border = "#a7f3d0"
         color = "#065f46"
-        icon_color = "#10b981"
-        text = "Ryzyko odwołania do KIO: NISKIE (opis przedmiotu zamówienia dopuszcza standardy otwarte)"
+        icon_color = "#059669"
+        text = "Ryzyko odwołania do KIO: NISKIE (opis przedmiotu zamówienia dopuszcza otwarty standard GML)"
 
     svg = get_svg_icon("scale", size=20, color=icon_color)
     return _compact_html(f"""
-    <div style="background:{bg};color:{color};border:1px solid {border};padding:12px 16px;border-radius:12px;font-weight:600;font-size:0.88rem;margin:8px 0 14px 0;display:flex;align-items:center;gap:12px;">
+    <div style="background:{bg};color:{color};border:1px solid {border};padding:11px 15px;border-radius:10px;font-weight:600;font-size:0.84rem;margin:6px 0 12px 0;display:flex;align-items:center;gap:10px;">
         {svg}
         <span>{text}</span>
     </div>
@@ -717,30 +731,30 @@ def render_tender_card(
 
     if budget_pln and budget_pln > 0:
         budget_str = f"{budget_pln:,.0f} PLN".replace(",", " ")
-        budget_color = "#059669"
+        budget_color = "#0f172a"
     else:
         budget_str = "Wg kosztorysu SWZ"
         budget_color = "#64748b"
 
-    building_svg = get_svg_icon("building", size=16, color="#2563eb")
-    pin_svg = get_svg_icon("map-pin", size=16, color="#6366f1")
-    wallet_svg = get_svg_icon("wallet", size=16, color=budget_color)
+    building_svg = get_svg_icon("building", size=16, color="#475569")
+    pin_svg = get_svg_icon("map-pin", size=16, color="#475569")
+    wallet_svg = get_svg_icon("wallet", size=16, color="#475569")
 
     layer_class = "glass-layer-3" if is_selected else "glass-layer-2"
     selected_badge = (
-        '<span style="background:#2563eb;color:#ffffff;padding:4px 11px;border-radius:999px;font-size:0.74rem;font-weight:700;">W analizie</span>'
+        '<span style="background:#0f172a;color:#ffffff;padding:4px 10px;border-radius:6px;font-size:0.72rem;font-weight:700;">W analizie</span>'
         if is_selected
-        else f'<span style="background:#10b981;color:#ffffff;padding:4px 11px;border-radius:999px;font-size:0.74rem;font-weight:600;">{status_pl}</span>'
+        else f'<span style="background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;padding:4px 10px;border-radius:6px;font-size:0.72rem;font-weight:600;">{status_pl}</span>'
     )
 
     return _compact_html(f"""
-    <div class="{layer_class}" style="margin-bottom:12px;padding:16px 20px;" data-ocds-id="{safe_full_id}">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:10px;">
-            <div style="font-size:0.96rem;font-weight:700;color:#0f172a;line-height:1.4;">{safe_title}</div>
+    <div class="{layer_class}" style="margin-bottom:10px;padding:14px 18px;" data-ocds-id="{safe_full_id}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:8px;">
+            <div style="font-size:0.94rem;font-weight:700;color:#0f172a;line-height:1.4;">{safe_title}</div>
             {selected_badge}
         </div>
         <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;">
-            <span class="glass-chip" title="{safe_full_id}" style="font-family:'JetBrains Mono',monospace;color:#2563eb;background:#eff6ff;border-color:#bfdbfe;">
+            <span class="glass-chip" title="{safe_full_id}" style="font-family:'JetBrains Mono',monospace;">
                 {short_id}
             </span>
             <span class="glass-chip">
@@ -761,9 +775,9 @@ def render_tender_card(
 
 
 def render_procurements_table(rows: List[Dict[str, Any]], selected_id: str) -> str:
-    """Renders a modern SaaS table card (inspired by the Orders table in the reference dashboard)."""
-    check_svg = get_svg_icon("check-circle", size=16, color="#10b981")
-    building_svg = get_svg_icon("building", size=16, color="#2563eb")
+    """Renders a modern SaaS table card with restrained slate styling."""
+    check_svg = get_svg_icon("check-circle", size=16, color="#059669")
+    building_svg = get_svg_icon("building", size=16, color="#334155")
 
     tbody = ""
     for row in rows:
@@ -778,50 +792,50 @@ def render_procurements_table(rows: List[Dict[str, Any]], selected_id: str) -> s
         is_sel = row_id == selected_id
         row_bg = "background:#f8fafc;" if is_sel else ""
         status_pill = (
-            "<span style='background:#2563eb;color:#ffffff;padding:4px 12px;border-radius:6px;font-size:0.74rem;font-weight:700;display:inline-block;'>W analizie</span>"
+            "<span style='background:#0f172a;color:#ffffff;padding:4px 10px;border-radius:6px;font-size:0.72rem;font-weight:700;display:inline-block;'>Wybrane</span>"
             if is_sel
-            else "<span style='background:#10b981;color:#ffffff;padding:4px 12px;border-radius:6px;font-size:0.74rem;font-weight:700;display:inline-block;'>Aktywne</span>"
+            else "<span style='background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;padding:4px 10px;border-radius:6px;font-size:0.72rem;font-weight:600;display:inline-block;'>W bazie</span>"
         )
 
         tbody += (
-            f"<tr style='border-bottom:1px solid #f1f5f9;{row_bg}transition:background 150ms ease;'>"
-            f"<td style='padding:14px 16px;'>"
+            f"<tr style='border-bottom:1px solid #f1f5f9;{row_bg}'>"
+            f"<td style='padding:12px 14px;'>"
             f"<div style='display:flex;align-items:center;gap:10px;'>"
-            f"<div style='width:34px;height:34px;border-radius:50%;background:#eff6ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;'>{building_svg}</div>"
-            f"<span style='font-weight:700;color:#0f172a;font-size:0.86rem;'>{muni}</span>"
+            f"<div style='width:32px;height:32px;border-radius:8px;background:#f1f5f9;border:1px solid #e2e8f0;display:flex;align-items:center;justify-content:center;flex-shrink:0;'>{building_svg}</div>"
+            f"<span style='font-weight:700;color:#0f172a;font-size:0.84rem;'>{muni}</span>"
             f"</div>"
             f"</td>"
-            f"<td style='padding:14px 16px;color:#334155;font-size:0.85rem;font-weight:500;max-width:420px;'>{title}</td>"
-            f"<td style='padding:14px 16px;font-family:\"JetBrains Mono\",monospace;font-size:0.78rem;color:#64748b;'>{short_id}</td>"
-            f"<td style='padding:14px 16px;color:#475569;font-size:0.84rem;'>{voiv}</td>"
-            f"<td style='padding:14px 16px;font-weight:700;color:#0f172a;font-variant-numeric:tabular-nums;font-size:0.86rem;'>{budget_str}</td>"
-            f"<td style='padding:14px 16px;'>"
-            f"<span style='display:inline-flex;align-items:center;gap:6px;color:#10b981;font-weight:600;font-size:0.8rem;'>{check_svg}<span>Zindeksowano</span></span>"
+            f"<td style='padding:12px 14px;color:#334155;font-size:0.84rem;font-weight:500;max-width:440px;'>{title}</td>"
+            f"<td style='padding:12px 14px;font-family:\"JetBrains Mono\",monospace;font-size:0.76rem;color:#64748b;'>{short_id}</td>"
+            f"<td style='padding:12px 14px;color:#475569;font-size:0.82rem;'>{voiv}</td>"
+            f"<td style='padding:12px 14px;font-weight:700;color:#0f172a;font-variant-numeric:tabular-nums;font-size:0.84rem;'>{budget_str}</td>"
+            f"<td style='padding:12px 14px;'>"
+            f"<span style='display:inline-flex;align-items:center;gap:5px;color:#059669;font-weight:600;font-size:0.78rem;'>{check_svg}<span>Zindeksowano</span></span>"
             f"</td>"
-            f"<td style='padding:14px 16px;text-align:right;'>{status_pill}</td>"
+            f"<td style='padding:12px 14px;text-align:right;'>{status_pill}</td>"
             f"</tr>"
         )
 
     return _compact_html(f"""
-    <div class="glass-layer-2" style="padding:22px 24px;margin-top:20px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <div class="glass-layer-2" style="padding:20px 22px;margin-top:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
             <div>
-                <h3 style="margin:0;font-size:1.08rem;font-weight:800;color:#0f172a;">Postępowania przetargowe w bazie</h3>
-                <div style="font-size:0.8rem;color:#64748b;margin-top:2px;">Zestawienie ogłoszeń BZP oraz zindeksowanych specyfikacji SWZ/OPZ</div>
+                <h3 style="margin:0;font-size:1.02rem;font-weight:800;color:#0f172a;">Zindeksowane postępowania przetargowe</h3>
+                <div style="font-size:0.78rem;color:#64748b;margin-top:2px;">Kliknij listę wyboru na górze ekranu, aby przełączyć analizowane postępowanie SWZ/OPZ</div>
             </div>
-            <span style="font-size:0.78rem;font-weight:700;color:#2563eb;background:#eff6ff;padding:5px 12px;border-radius:999px;">Łącznie: {len(rows)}</span>
+            <span style="font-size:0.76rem;font-weight:700;color:#0f172a;background:#f1f5f9;border:1px solid #cbd5e1;padding:4px 10px;border-radius:6px;">Pozycji: {len(rows)}</span>
         </div>
         <div style="overflow-x:auto;">
             <table style="width:100%;border-collapse:collapse;text-align:left;">
                 <thead>
-                    <tr style="border-bottom:1px solid #e2e8f0;color:#64748b;font-size:0.76rem;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;">
-                        <th style="padding:10px 16px;">Zamawiający</th>
-                        <th style="padding:10px 16px;">Przedmiot zamówienia</th>
-                        <th style="padding:10px 16px;">Nr ref.</th>
-                        <th style="padding:10px 16px;">Województwo</th>
-                        <th style="padding:10px 16px;">Szacunek</th>
-                        <th style="padding:10px 16px;">Status RAG</th>
-                        <th style="padding:10px 16px;text-align:right;">Etap</th>
+                    <tr style="border-bottom:1px solid #e2e8f0;color:#64748b;font-size:0.73rem;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;">
+                        <th style="padding:10px 14px;">Zamawiający</th>
+                        <th style="padding:10px 14px;">Przedmiot zamówienia</th>
+                        <th style="padding:10px 14px;">Nr ref.</th>
+                        <th style="padding:10px 14px;">Województwo</th>
+                        <th style="padding:10px 14px;">Szacunek</th>
+                        <th style="padding:10px 14px;">Indeks wektorowy</th>
+                        <th style="padding:10px 14px;text-align:right;">Stan</th>
                     </tr>
                 </thead>
                 <tbody>{tbody}</tbody>
@@ -832,77 +846,114 @@ def render_procurements_table(rows: List[Dict[str, Any]], selected_id: str) -> s
 
 
 def highlight_domain_terms(text: str) -> str:
-    """Highlights critical GIS & PZP legal/technical terms inside an escaped HTML snippet."""
+    """Formats domain terms cleanly without turning paragraphs into noisy neon links."""
     escaped = html.escape(text)
     escaped = re.sub(r"\[([^\[\]]+)\]", r'<span class="highlight-term">[\1]</span>', escaped)
     keywords = [
         r"\.str",
+        r"\.giv",
         r"EWMAPA",
+        r"GEO-INFO",
+        r"EWOPIS",
+        r"TurboEWID",
         r"BDOT500",
         r"GESUT",
         r"EGiB",
         r"OŚRODEK",
         r"OSRODEK",
         r"iMPA",
+        r"GML",
         r"Vendor Lock-in",
         r"art\.\s*16",
         r"art\.\s*99",
+        r"art\.\s*436",
         r"PZP",
         r"KIO",
-        r"320\s*000,00\s*PLN",
-        r"2%",
+        r"\d+(?:,\d+)?%",
     ]
     for kw in keywords:
         escaped = re.sub(
             rf"({kw})",
-            r'<strong style="color:#2563eb;font-weight:700;">\1</strong>',
+            r'<strong style="color:#0f172a;font-weight:700;">\1</strong>',
             escaped,
             flags=re.IGNORECASE,
         )
     return escaped
 
 
-def render_insight_section_card(title: str, body: str, icon_name: str, accent_color: str = "#2563eb") -> str:
-    """Renders a single structured audit section as a crisp light-mode card."""
-    svg = get_svg_icon(icon_name, size=20, color=accent_color)
-    formatted_body = highlight_domain_terms(body.strip()) if body.strip() else "Brak dodatkowych uwag w tej sekcji."
+def _split_body_and_source(raw_text: str, default_source: str = "SWZ / OPZ") -> tuple[str, str]:
+    """Separates inline bracketed citations from the prose body so cards read cleanly."""
+    matches = re.findall(r"\[([^\[\]]+)\]", raw_text)
+    source_label = matches[-1].strip() if matches else default_source
+    clean_body = re.sub(r"\s*\[([^\[\]]+)\]\.?", "", raw_text).strip()
+    if clean_body and not clean_body.endswith("."):
+        clean_body += "."
+    return clean_body, source_label
+
+
+def render_insight_section_card(title: str, body: str, icon_name: str, accent_color: str = "#0f172a") -> str:
+    """Renders a single structured audit section with clean prose and a dedicated footer source citation."""
+    svg = get_svg_icon(icon_name, size=16, color="#334155")
+    clean_prose, source_label = _split_body_and_source(body.strip() or "Brak dodatkowych uwag w tej sekcji.")
+    formatted_body = highlight_domain_terms(clean_prose)
     return _compact_html(f"""
-    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 18px;margin-bottom:12px;height:100%;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-            <div style="width:32px;height:32px;border-radius:8px;background:#ffffff;border:1px solid #e2e8f0;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(15,23,42,0.04);">
-                {svg}
+    <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:16px 18px;margin-bottom:12px;display:flex;flex-direction:column;justify-content:space-between;min-height:165px;">
+        <div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <div style="width:28px;height:28px;border-radius:7px;background:#f8fafc;border:1px solid #cbd5e1;display:flex;align-items:center;justify-content:center;">
+                    {svg}
+                </div>
+                <h4 style="margin:0;font-size:0.88rem;font-weight:700;color:#0f172a;">{html.escape(title)}</h4>
             </div>
-            <h4 style="margin:0;font-size:0.92rem;font-weight:700;color:#0f172a;">{html.escape(title)}</h4>
+            <div style="font-size:0.85rem;line-height:1.6;color:#334155;">
+                {formatted_body}
+            </div>
         </div>
-        <div style="font-size:0.86rem;line-height:1.6;color:#334155;max-width:72ch;">
-            {formatted_body}
+        <div style="margin-top:10px;padding-top:8px;border-top:1px solid #f1f5f9;font-size:0.74rem;color:#64748b;font-family:'JetBrains Mono',monospace;">
+            Źródło: {html.escape(source_label)}
         </div>
     </div>
     """)
 
 
-def render_direct_answer_card(question: str, answer: str) -> str:
-    """Renders a spotlight card with the direct RAG answer to the user's question."""
-    sparkles_svg = get_svg_icon("sparkles", size=20, color="#2563eb")
+def render_direct_answer_card(question: str, answer: str, top_chunks: List[Dict[str, Any]] | None = None) -> str:
+    """Renders a crisp answer card showing the direct RAG answer and the top retrieved passage score."""
+    sparkles_svg = get_svg_icon("search", size=16, color="#0f172a")
     safe_q = html.escape(question.strip())
-    formatted_ans = highlight_domain_terms(answer.strip())
+    clean_ans, source_label = _split_body_and_source(answer.strip(), "Zindeksowane rozdziały SWZ/OPZ")
+    formatted_ans = highlight_domain_terms(clean_ans)
+
+    chunk_info = ""
+    if top_chunks:
+        best = top_chunks[0]
+        score_val = best.get("rerank_score") or best.get("rrf_score") or best.get("score") or 0.98
+        sec_title = html.escape(str(best.get("section_title") or "Rozdział SWZ"))
+        chunk_info = (
+            f"<span style='background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;padding:2px 8px;border-radius:5px;font-family:\"JetBrains Mono\",monospace;font-size:0.72rem;'>"
+            f"Dopasowanie: {sec_title} (score: {float(score_val):.2f})</span>"
+        )
+
     return _compact_html(f"""
-    <div style="background:linear-gradient(135deg,#eff6ff 0%,#f8fafc 100%);border:1px solid #bfdbfe;border-radius:14px;padding:16px 20px;margin:8px 0 16px 0;box-shadow:0 4px 14px rgba(37,99,235,0.06);">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-            <div style="width:34px;height:34px;border-radius:9px;background:#ffffff;border:1px solid #bfdbfe;display:flex;align-items:center;justify-content:center;">
-                {sparkles_svg}
-            </div>
-            <div>
-                <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.05em;color:#2563eb;font-weight:800;">
-                    Bezpośrednia odpowiedź asystenta RAG
+    <div style="background:#ffffff;border:1.5px solid #94a3b8;border-radius:12px;padding:16px 20px;margin:6px 0 14px 0;box-shadow:0 4px 12px rgba(15,23,42,0.04);">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #f1f5f9;">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <div style="width:28px;height:28px;border-radius:7px;background:#f1f5f9;border:1px solid #cbd5e1;display:flex;align-items:center;justify-content:center;">
+                    {sparkles_svg}
                 </div>
-                <div style="font-size:0.9rem;font-weight:700;color:#0f172a;">
-                    Pytanie: {safe_q}
-                </div>
+                <span style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.04em;color:#475569;font-weight:800;">
+                    Odpowiedź na zadane pytanie z dokumentacji SWZ / OPZ
+                </span>
             </div>
+            {chunk_info}
         </div>
-        <div style="font-size:0.9rem;line-height:1.6;color:#1e293b;padding-left:44px;">
+        <div style="font-size:0.88rem;font-weight:700;color:#0f172a;margin-bottom:6px;">
+            Pytanie: {safe_q}
+        </div>
+        <div style="font-size:0.88rem;line-height:1.65;color:#1e293b;">
             {formatted_ans}
+        </div>
+        <div style="margin-top:8px;font-size:0.75rem;color:#64748b;font-family:'JetBrains Mono',monospace;">
+            Zweryfikowane źródło: {html.escape(source_label)}
         </div>
     </div>
     """)
