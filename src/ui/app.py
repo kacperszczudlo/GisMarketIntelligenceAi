@@ -1,5 +1,4 @@
 import asyncio
-import html
 import logging
 from pathlib import Path
 import sys
@@ -22,19 +21,23 @@ from src.ui.components import (
     _compact_html,
     get_glassmorphism_stylesheet,
     get_svg_icon,
+    render_brand_sidebar_header,
     render_citation_box,
     render_competitor_matrix,
     render_direct_answer_card,
     render_insight_section_card,
     render_kio_warning,
+    render_kpi_stat_card,
+    render_procurements_table,
     render_red_flag_badge,
-    render_tender_card,
+    render_risk_profile_panel,
+    render_top_utility_bar,
 )
 
 logger = logging.getLogger("src.ui.app")
 
 st.set_page_config(
-    page_title="GisMarketIntelligenceAi | Audyt zamówień GIS",
+    page_title="GisMarket Intelligence AI | Audyt zamówień GIS",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -220,21 +223,23 @@ def main() -> None:
     if df.empty:
         df = get_sample_procurements()
 
-    # Sidebar: Filters & Infrastructure Status
+    # Left Sidebar: Compact Brand Logo at Top-Left + Tender Selection + Filters
     with st.sidebar:
-        sliders_svg = get_svg_icon("sliders", size=20, color="#38bdf8")
+        st.markdown(render_brand_sidebar_header(), unsafe_allow_html=True)
+
+        layers_svg = get_svg_icon("layers", size=16, color="#2563eb")
         st.markdown(
             _compact_html(f"""
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-                {sliders_svg}
-                <span style="font-weight:700;font-size:1rem;color:#f8fafc;">Filtrowanie zamówień</span>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;color:#0f172a;font-weight:700;font-size:0.84rem;">
+                {layers_svg}
+                <span>Wybór i filtrowanie SWZ</span>
             </div>
             """),
             unsafe_allow_html=True,
         )
 
         voivodeships = ["Wszystkie"] + sorted(df["Województwo"].dropna().unique().tolist())
-        selected_voiv = st.selectbox("Województwo", voivodeships)
+        selected_voiv = st.selectbox("Region (Województwo)", voivodeships)
         min_budget = st.number_input("Minimalny budżet (PLN)", min_value=0, value=0, step=50000)
 
         filtered_df = df.copy()
@@ -242,188 +247,180 @@ def main() -> None:
             filtered_df = filtered_df[filtered_df["Województwo"] == selected_voiv]
         if min_budget > 0:
             filtered_df = filtered_df[filtered_df["Budżet PLN"] >= min_budget]
+        if filtered_df.empty:
+            filtered_df = df.copy()
 
-        st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
-        cpu_svg = get_svg_icon("cpu", size=20, color="#38bdf8")
-        db_svg = get_svg_icon("database", size=16, color="#34d399")
-        ollama_ok = check_ollama_health()
-        status_dot_color = "#34d399" if ollama_ok else "#fbbf24"
-        status_label = "Silnik Ollama aktywny" if ollama_ok else "Tryb syntezy deterministycznej"
+        options_map: Dict[str, pd.Series] = {}
+        option_labels = []
+        for _, row in filtered_df.iterrows():
+            label = f"{row['Zamawiający']} — {str(row['Tytuł'])[:45]}..."
+            options_map[label] = row
+            option_labels.append(label)
 
+        selected_label = st.selectbox("Aktywne postępowanie", option_labels, index=0)
+
+        st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
+        sliders_svg = get_svg_icon("sparkles", size=16, color="#2563eb")
         st.markdown(
             _compact_html(f"""
-            <div class="glass-layer-1" style="padding:16px;">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-                    {cpu_svg}
-                    <span style="font-weight:700;font-size:0.9rem;color:#f8fafc;">Status środowiska AI</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.84rem;color:#e2e8f0;">
-                    <span style="width:8px;height:8px;border-radius:50%;background:{status_dot_color};box-shadow:0 0 10px {status_dot_color};display:inline-block;"></span>
-                    <span>{status_label}</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;font-size:0.82rem;color:#cbd5e1;">
-                    {db_svg}
-                    <span>PostgreSQL 16 + pgvector HNSW</span>
-                </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;color:#0f172a;font-weight:700;font-size:0.84rem;">
+                {sliders_svg}
+                <span>Szablony pytań PZP / GIS</span>
             </div>
             """),
             unsafe_allow_html=True,
         )
-
-    if filtered_df.empty:
-        filtered_df = df.copy()
-
-    # 1. Top Frosted Glass Header
-    compass_svg = get_svg_icon("compass", size=24, color="#38bdf8")
-    sparkles_svg = get_svg_icon("sparkles", size=16, color="#7dd3fc")
-    st.markdown(
-        _compact_html(f"""
-        <div class="glass-layer-2" style="margin-bottom:24px;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;">
-            <div style="display:flex;align-items:center;gap:16px;">
-                <div style="width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,rgba(56,189,248,0.24),rgba(99,102,241,0.24));border:1px solid rgba(255,255,255,0.28);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(14,165,233,0.28);">
-                    {compass_svg}
-                </div>
-                <div>
-                    <h1 class="hero-title">GisMarketIntelligenceAi</h1>
-                    <p style="margin:4px 0 0 0;color:#cbd5e1;font-size:0.94rem;">
-                        Audyt barier konkurencyjnych SWZ/OPZ, weryfikacja formatów wymiany danych i ocena ryzyka odwołań do KIO
-                    </p>
-                </div>
-            </div>
-            <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(56,189,248,0.14);border:1px solid rgba(56,189,248,0.35);padding:8px 14px;border-radius:999px;font-size:0.82rem;color:#e0f2fe;font-weight:600;">
-                {sparkles_svg}
-                <span>Kontrola wierności RAGAS &ge; 0.95</span>
-            </div>
-        </div>
-        """),
-        unsafe_allow_html=True,
-    )
-
-    # 2. Interactive RAG Query & Template Cockpit at the Top
-    options_map: Dict[str, pd.Series] = {}
-    option_labels = []
-    for _, row in filtered_df.iterrows():
-        budget_val = float(row["Budżet PLN"]) if pd.notna(row["Budżet PLN"]) else 0.0
-        budget_tag = f"{budget_val:,.0f} PLN".replace(",", " ") if budget_val > 0 else "Budżet wg SWZ"
-        label = f"{row['Zamawiający']} | {str(row['Tytuł'])[:68]} ({budget_tag})"
-        options_map[label] = row
-        option_labels.append(label)
-
-    col_select, col_template = st.columns([1.15, 1.0])
-    with col_select:
-        selected_label = st.selectbox("1. Wybierz postępowanie przetargowe", option_labels, index=0)
-    with col_template:
         template_names = list(RAG_QUESTION_TEMPLATES.keys())
         selected_template_name = st.selectbox(
-            "2. Wybierz gotowy szablon pytania eksperckiego (lub wpisz własne poniżej)",
+            "Wybierz gotowy szablon pytania",
             template_names,
             index=0,
         )
 
-    # Sync text input when template dropdown changes, while allowing manual edits at any time
+    selected_row = options_map[selected_label]
+    selected_id = str(selected_row["ID"])
+    ollama_ok = check_ollama_health()
+
+    # Sync question input with template dropdown when changed
     template_default_text = RAG_QUESTION_TEMPLATES[selected_template_name]
     if st.session_state.get("prev_template_name") != selected_template_name:
         st.session_state["prev_template_name"] = selected_template_name
         st.session_state["rag_question_input"] = (
             template_default_text
             if template_default_text
-            else "Czy zamawiający dopuszcza format otwarty GML zamiast zamkniętego .str i jakie przewidział kary umowne?"
+            else "Czy zamawiający dopuszcza otwarty format GML zamiast zamkniętego .str?"
         )
 
-    col_query_input, col_cta = st.columns([3.2, 1.0])
-    with col_query_input:
-        user_question = st.text_input(
-            "3. Pytanie do dokumentacji SWZ/OPZ (możesz edytować szablon lub wpisać dowolne własne pytanie)",
-            key="rag_question_input",
-        )
-    with col_cta:
-        st.markdown("<div style='height:28px;'></div>", unsafe_allow_html=True)
-        trigger_btn = st.button("Zadaj pytanie i uruchom audyt", use_container_width=True)
+    current_q = st.session_state.get(
+        "rag_question_input",
+        RAG_QUESTION_TEMPLATES[template_names[0]],
+    )
 
-    selected_row = options_map[selected_label]
-    selected_id = str(selected_row["ID"])
-
-    state_key = f"{selected_id}::{user_question}"
-    if trigger_btn or st.session_state.get("last_audit_key") != state_key:
-        with st.spinner("Przeszukiwanie hybrydowe SWZ/OPZ i weryfikacja wierności RAGAS..."):
+    state_key = f"{selected_id}::{current_q}"
+    if st.session_state.get("last_audit_key") != state_key:
+        with st.spinner("Analiza dokumentacji SWZ/OPZ..."):
             st.session_state["analysis_result"] = run_rag_analysis(
                 ocds_id=selected_id,
                 title=str(selected_row["Tytuł"]),
                 municipality=str(selected_row["Zamawiający"]),
-                custom_query=user_question,
+                custom_query=current_q,
             )
             st.session_state["last_audit_key"] = state_key
 
     result = st.session_state.get("analysis_result")
+    report = result["report"]
+    eval_res = result["evaluation"]
+    sections = result.get("sections") or parse_report_sections(report.raw_llm_output)
+    full_text_lower = report.markdown_report.lower()
 
-    # 3. Three High-Impact Spotlight Cards (Most Important Data Immediately Visible)
-    if result:
-        report = result["report"]
-        eval_res = result["evaluation"]
-        sections = result.get("sections") or parse_report_sections(report.raw_llm_output)
-        full_text_lower = report.markdown_report.lower()
+    has_lockin = ".str" in full_text_lower or "ewmapa" in full_text_lower or "vendor lock-in" in full_text_lower
+    has_penalties = "kar" in full_text_lower or "2%" in full_text_lower
 
-        has_lockin = ".str" in full_text_lower or "ewmapa" in full_text_lower or "vendor lock-in" in full_text_lower
-        has_penalties = "kar" in full_text_lower or "2%" in full_text_lower
+    # 1. Top Utility Navbar (Breadcrumbs Left + Status Pills Right)
+    st.markdown(
+        render_top_utility_bar(
+            municipality=str(selected_row["Zamawiający"]),
+            voivodeship=str(selected_row["Województwo"]),
+            ollama_ok=ollama_ok,
+            total_tenders=len(filtered_df),
+            has_lockin=has_lockin,
+        ),
+        unsafe_allow_html=True,
+    )
 
-        kio_status = "WYSOKIE RYZYKO" if has_lockin else "NISKIE RYZYKO"
-        kio_color = "#f87171" if has_lockin else "#34d399"
-        kio_sub = "Wykryto wymóg zamkniętego formatu .str (art. 16 i 99 PZP)" if has_lockin else "Brak barier wykluczających"
+    # 2. Row 1: 4 Horizontal KPI Cards with Circular Colored Icon Badges
+    sel_budget = float(selected_row["Budżet PLN"]) if pd.notna(selected_row["Budżet PLN"]) else 0.0
+    if sel_budget >= 1000:
+        budget_short = f"{sel_budget / 1000:.0f} tys. PLN"
+    else:
+        budget_short = "Wg SWZ"
 
-        sel_budget = float(selected_row["Budżet PLN"]) if pd.notna(selected_row["Budżet PLN"]) else 0.0
-        budget_display = f"{sel_budget:,.0f} PLN".replace(",", " ") if sel_budget > 0 else "Wg kosztorysu SWZ"
-        faith_pct = f"{eval_res.faithfulness * 100:.0f}%"
+    k1, k2, k3, k4 = st.columns(4)
+    with k1:
+        st.markdown(
+            render_kpi_stat_card(
+                value="WYSOKIE" if has_lockin else "NISKIE",
+                label="Ryzyko odwołania KIO",
+                sublabel="Art. 16 i 99 PZP (format .str)",
+                icon_name="shield-alert",
+                color_hex="#ff6b57" if has_lockin else "#10b981",
+                ring_bg="rgba(255, 107, 87, 0.14)" if has_lockin else "rgba(16, 185, 129, 0.14)",
+                stagger_index=0,
+            ),
+            unsafe_allow_html=True,
+        )
+    with k2:
+        st.markdown(
+            render_kpi_stat_card(
+                value=budget_short,
+                label="Szacowany budżet",
+                sublabel=str(selected_row["Zamawiający"]),
+                icon_name="wallet",
+                color_hex="#3b82f6",
+                ring_bg="rgba(59, 130, 246, 0.14)",
+                stagger_index=1,
+            ),
+            unsafe_allow_html=True,
+        )
+    with k3:
+        st.markdown(
+            render_kpi_stat_card(
+                value="2% / dzień" if has_penalties else "Standard",
+                label="Kary umowne w SWZ",
+                sublabel="Brak górnego limitu (cap)" if has_penalties else "Zgodne z art. 436 PZP",
+                icon_name="scale",
+                color_hex="#f59e0b",
+                ring_bg="rgba(245, 158, 11, 0.14)",
+                stagger_index=2,
+            ),
+            unsafe_allow_html=True,
+        )
+    with k4:
+        st.markdown(
+            render_kpi_stat_card(
+                value=f"{eval_res.faithfulness * 100:.0f}%",
+                label="Wierność RAGAS",
+                sublabel=f"Faithfulness: {eval_res.faithfulness:.2f} (próg ≥ 0.95)",
+                icon_name="check-circle",
+                color_hex="#10b981",
+                ring_bg="rgba(16, 185, 129, 0.14)",
+                stagger_index=3,
+            ),
+            unsafe_allow_html=True,
+        )
 
-        scale_svg = get_svg_icon("scale", size=20, color=kio_color)
-        wallet_svg = get_svg_icon("wallet", size=20, color="#38bdf8")
-        check_svg = get_svg_icon("check-circle", size=20, color="#34d399")
+    st.markdown("<div style='height:18px;'></div>", unsafe_allow_html=True)
 
-        sp1, sp2, sp3 = st.columns(3)
-        with sp1:
-            st.markdown(
-                _compact_html(f"""
-                <div class="glass-layer-3">
-                    <div class="spotlight-label">{scale_svg}<span>Werdykt PZP i ryzyko KIO</span></div>
-                    <div class="spotlight-value" style="color:{kio_color};">{kio_status}</div>
-                    <div class="spotlight-caption">{html.escape(kio_sub)}</div>
-                </div>
-                """),
-                unsafe_allow_html=True,
+    # 3. Row 2: Asymmetric Main Split (Left Analytical Workspace ~69% + Right Risk Profile Card ~31%)
+    main_left, main_right = st.columns([2.25, 1.0])
+
+    with main_left:
+        # Clean inline question bar (editable template or custom question + single action button)
+        q_col, btn_col = st.columns([3.5, 1.0])
+        with q_col:
+            user_question = st.text_input(
+                "Zadaj pytanie do dokumentacji SWZ/OPZ (wybierz szablon w panelu bocznym lub wpisz własne)",
+                key="rag_question_input",
             )
-        with sp2:
-            st.markdown(
-                _compact_html(f"""
-                <div class="glass-layer-2">
-                    <div class="spotlight-label">{wallet_svg}<span>Wartość zamówienia i zamawiający</span></div>
-                    <div class="spotlight-value">{budget_display}</div>
-                    <div class="spotlight-caption">{html.escape(str(selected_row['Zamawiający']))} ({html.escape(str(selected_row['Województwo']))})</div>
-                </div>
-                """),
-                unsafe_allow_html=True,
-            )
-        with sp3:
-            st.markdown(
-                _compact_html(f"""
-                <div class="glass-layer-2">
-                    <div class="spotlight-label">{check_svg}<span>Wierność odpowiedzi AI (RAGAS)</span></div>
-                    <div class="spotlight-value" style="color:#34d399;">{faith_pct}</div>
-                    <div class="spotlight-caption">Faithfulness: {eval_res.faithfulness:.4f} (wymagany próg &ge; 0.95)</div>
-                </div>
-                """),
-                unsafe_allow_html=True,
-            )
+        with btn_col:
+            st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
+            if st.button("Analizuj pytanie", use_container_width=True):
+                st.session_state["analysis_result"] = run_rag_analysis(
+                    ocds_id=selected_id,
+                    title=str(selected_row["Tytuł"]),
+                    municipality=str(selected_row["Zamawiający"]),
+                    custom_query=user_question,
+                )
+                st.session_state["last_audit_key"] = f"{selected_id}::{user_question}"
+                result = st.session_state["analysis_result"]
 
-        st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
-
-        # 4. Clean Tabbed Navigation so content never blurs together
-        tab_audit, tab_evidence, tab_catalog = st.tabs([
-            "Wnioski i raport wykonawczy",
-            "Konkurencja i dowody z SWZ",
-            f"Katalog postępowań w bazie ({len(filtered_df)})",
+        tab_insights, tab_sources, tab_export = st.tabs([
+            "Wnioski i audyt SWZ",
+            "Konkurencja i dowody",
+            "Eksport raportu (.md)",
         ])
 
-        with tab_audit:
-            # Direct Spotlight Answer to the User's Selected or Custom Question
+        with tab_insights:
             st.markdown(
                 render_direct_answer_card(
                     question=result.get("active_question", user_question),
@@ -432,134 +429,103 @@ def main() -> None:
                 unsafe_allow_html=True,
             )
 
+            r1c1, r1c2 = st.columns(2)
+            with r1c1:
+                st.markdown(
+                    render_insight_section_card(
+                        title="1. Zakres i przedmiot zamówienia",
+                        body=sections.get("summary", ""),
+                        icon_name="layers",
+                        accent_color="#2563eb",
+                    ),
+                    unsafe_allow_html=True,
+                )
+            with r1c2:
+                st.markdown(
+                    render_insight_section_card(
+                        title="2. Bariery techniczne (Vendor Lock-in)",
+                        body=sections.get("legal_barriers", ""),
+                        icon_name="shield-alert",
+                        accent_color="#e11d48",
+                    ),
+                    unsafe_allow_html=True,
+                )
+
+            r2c1, r2c2 = st.columns(2)
+            with r2c1:
+                st.markdown(
+                    render_insight_section_card(
+                        title="3. Kary umowne i wymogi kadrowe",
+                        body=sections.get("recommendations", ""),
+                        icon_name="scale",
+                        accent_color="#d97706",
+                    ),
+                    unsafe_allow_html=True,
+                )
+            with r2c2:
+                st.markdown(
+                    render_insight_section_card(
+                        title="4. Wymagane systemy dziedzinowe GIS",
+                        body=sections.get("competitors", ""),
+                        icon_name="radar",
+                        accent_color="#6366f1",
+                    ),
+                    unsafe_allow_html=True,
+                )
+
+        with tab_sources:
             badges_html = ""
             if has_lockin:
                 badges_html += render_red_flag_badge("vendor_lockin")
             if has_penalties:
                 badges_html += render_red_flag_badge("asymetria_kar")
             if badges_html:
-                st.markdown(f"<div style='margin:8px 0 4px 0;'>{badges_html}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='margin-bottom:8px;'>{badges_html}</div>", unsafe_allow_html=True)
 
             st.markdown(render_kio_warning("HIGH" if has_lockin else "LOW"), unsafe_allow_html=True)
 
-            # 2x2 Frosted Glass Insight Grid
-            row1_col1, row1_col2 = st.columns(2)
-            with row1_col1:
-                st.markdown(
-                    render_insight_section_card(
-                        title="1. Zakres i przedmiot zamówienia",
-                        body=sections.get("summary", ""),
-                        icon_name="layers",
-                        accent_color="#38bdf8",
-                    ),
-                    unsafe_allow_html=True,
-                )
-            with row1_col2:
-                st.markdown(
-                    render_insight_section_card(
-                        title="2. Wykryte bariery techniczne i prawne",
-                        body=sections.get("legal_barriers", ""),
-                        icon_name="shield-alert",
-                        accent_color="#f87171",
-                    ),
-                    unsafe_allow_html=True,
-                )
+            competitors_data = [
+                {
+                    "name": "Geobid Sp. z o.o.",
+                    "product": "EWMAPA / OŚRODEK",
+                    "advantage": "Wymóg przekazywania operatów w zamkniętym formacie .str",
+                },
+                {
+                    "name": "Geo-System Sp. z o.o.",
+                    "product": "iMPA / e-Gmina",
+                    "advantage": "Wymagana bezpośrednia integracja z portalem mapowym gminy",
+                },
+            ]
+            st.markdown(render_competitor_matrix(competitors_data), unsafe_allow_html=True)
 
-            row2_col1, row2_col2 = st.columns(2)
-            with row2_col1:
-                st.markdown(
-                    render_insight_section_card(
-                        title="3. Rekomendacje i ryzyka kontraktowe",
-                        body=sections.get("recommendations", ""),
-                        icon_name="scale",
-                        accent_color="#fbbf24",
-                    ),
-                    unsafe_allow_html=True,
-                )
-            with row2_col2:
-                st.markdown(
-                    render_insight_section_card(
-                        title="4. Układ sił i wymagane systemy GIS",
-                        body=sections.get("competitors", ""),
-                        icon_name="radar",
-                        accent_color="#818cf8",
-                    ),
-                    unsafe_allow_html=True,
-                )
+            for citation in report.citations:
+                st.markdown(render_citation_box(citation), unsafe_allow_html=True)
 
+        with tab_export:
             st.download_button(
                 label="Pobierz pełny raport w formacie Markdown (.md)",
                 data=report.markdown_report,
                 file_name=f"raport_{selected_id}.md",
                 mime="text/markdown",
             )
+            st.code(report.markdown_report, language="markdown")
 
-        with tab_evidence:
-            ev_col1, ev_col2 = st.columns([1.15, 1.0])
-            with ev_col1:
-                radar_svg = get_svg_icon("radar", size=20, color="#38bdf8")
-                st.markdown(
-                    _compact_html(f"""
-                    <div style="display:flex;align-items:center;gap:10px;margin:8px 0 12px 0;">
-                        {radar_svg}
-                        <h3 class="section-heading">Macierz konkurencji regionalnej</h3>
-                    </div>
-                    """),
-                    unsafe_allow_html=True,
-                )
-                competitors_data = [
-                    {
-                        "name": "Geobid Sp. z o.o.",
-                        "product": "EWMAPA / OŚRODEK",
-                        "advantage": "Wymóg przekazywania operatów w zamkniętym formacie .str",
-                    },
-                    {
-                        "name": "Geo-System Sp. z o.o.",
-                        "product": "iMPA / e-Gmina",
-                        "advantage": "Wymagana bezpośrednia integracja z portalem mapowym gminy",
-                    },
-                ]
-                st.markdown(render_competitor_matrix(competitors_data), unsafe_allow_html=True)
+    with main_right:
+        st.markdown(
+            render_risk_profile_panel(
+                has_lockin=has_lockin,
+                has_penalties=has_penalties,
+                faithfulness=eval_res.faithfulness,
+            ),
+            unsafe_allow_html=True,
+        )
 
-            with ev_col2:
-                file_svg = get_svg_icon("file-check", size=20, color="#34d399")
-                st.markdown(
-                    _compact_html(f"""
-                    <div style="display:flex;align-items:center;gap:10px;margin:8px 0 12px 0;">
-                        {file_svg}
-                        <h3 class="section-heading">Zweryfikowane źródła dowodowe SWZ/OPZ</h3>
-                    </div>
-                    """),
-                    unsafe_allow_html=True,
-                )
-                for citation in report.citations:
-                    st.markdown(render_citation_box(citation), unsafe_allow_html=True)
-
-        with tab_catalog:
-            layers_svg = get_svg_icon("layers", size=20, color="#38bdf8")
-            st.markdown(
-                _compact_html(f"""
-                <div style="display:flex;align-items:center;gap:10px;margin:8px 0 16px 0;">
-                    {layers_svg}
-                    <h3 class="section-heading">Wszystkie zindeksowane postępowania ({len(filtered_df)})</h3>
-                </div>
-                """),
-                unsafe_allow_html=True,
-            )
-            for _, row in filtered_df.iterrows():
-                row_id = str(row["ID"])
-                st.markdown(
-                    render_tender_card(
-                        ocds_id=row_id,
-                        title=str(row["Tytuł"]),
-                        municipality=str(row["Zamawiający"]),
-                        voivodeship=str(row["Województwo"]),
-                        budget_pln=float(row["Budżet PLN"]) if pd.notna(row["Budżet PLN"]) else 0.0,
-                        status=str(row.get("Status", "ACTIVE")),
-                        is_selected=(row_id == selected_id),
-                    ),
-                    unsafe_allow_html=True,
-                )
+    # 4. Row 3: Full-Width Clean Procurements Table Card (Bottom Section)
+    table_records = filtered_df.to_dict(orient="records")
+    st.markdown(
+        render_procurements_table(rows=table_records, selected_id=selected_id),
+        unsafe_allow_html=True,
+    )
 
 
 if __name__ == "__main__":

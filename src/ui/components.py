@@ -1,6 +1,6 @@
 import html
 import re
-from typing import Dict, List
+from typing import Any, Dict, List
 
 
 def _compact_html(raw_html: str) -> str:
@@ -9,10 +9,27 @@ def _compact_html(raw_html: str) -> str:
 
 
 def get_svg_icon(name: str, size: int = 20, color: str = "currentColor") -> str:
-    """Returns clean, custom inline SVG vector icons sized strictly on the ui-scale-architecture grid (16, 20, 24, 32, 48)."""
+    """Returns clean, custom inline SVG vector icons sized strictly on the 8pt/4pt UI scale (16, 20, 24, 32, 48)."""
     allowed_sizes = {16, 20, 24, 32, 48}
     resolved_size = size if size in allowed_sizes else 20
     icons: Dict[str, str] = {
+        "brand-mark": (
+            '<path d="M12 3 4 9l8 6 8-6-8-6Z" fill="rgba(37,99,235,0.18)"></path>'
+            '<path d="M4 14l8 6 8-6"></path>'
+            '<path d="M12 3 4 9l8 6 8-6-8-6Z"></path>'
+        ),
+        "home": (
+            '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>'
+            '<polyline points="9 22 9 12 15 12 15 22"></polyline>'
+        ),
+        "search": (
+            '<circle cx="11" cy="11" r="8"></circle>'
+            '<line x1="21" y1="21" x2="16.65" y2="16.65"></line>'
+        ),
+        "bell": (
+            '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path>'
+            '<path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path>'
+        ),
         "layers": (
             '<polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>'
             '<polyline points="2 17 12 22 22 17"></polyline>'
@@ -95,283 +112,285 @@ def get_svg_icon(name: str, size: int = 20, color: str = "currentColor") -> str:
     body = icons.get(name, icons["layers"])
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{resolved_size}" height="{resolved_size}" '
-        f'viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="1.85" '
+        f'viewBox="0 0 24 24" fill="none" stroke="{color}" stroke-width="2" '
         f'stroke-linecap="round" stroke-linejoin="round" '
         f'style="flex-shrink:0;vertical-align:middle;display:inline-block;">{body}</svg>'
     )
 
 
 def get_glassmorphism_stylesheet() -> str:
-    """Returns true multi-layered Glassmorphism CSS combined with 8pt UI Scale Architecture tokens."""
+    """Returns a bright, airy Daylight Frosted-Glass SaaS stylesheet with purposeful state transitions."""
     return """
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
         :root {
-            /* 8pt Spatial Architecture Tokens */
-            --space-1: 0.25rem;  /* 4px micro */
-            --space-2: 0.5rem;   /* 8px */
-            --space-3: 1rem;     /* 16px */
-            --space-4: 1.5rem;   /* 24px */
-            --space-5: 2rem;     /* 32px */
-            --space-6: 3rem;     /* 48px */
-
-            /* Multi-Layered Glassmorphism Tokens */
-            --glass-bg-layer-1: linear-gradient(135deg, rgba(15, 23, 42, 0.56) 0%, rgba(15, 23, 42, 0.36) 100%);
-            --glass-bg-layer-2: linear-gradient(135deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.04) 100%);
-            --glass-bg-layer-3: linear-gradient(135deg, rgba(56, 189, 248, 0.18) 0%, rgba(99, 102, 241, 0.11) 50%, rgba(255, 255, 255, 0.05) 100%);
-            --glass-rim: rgba(255, 255, 255, 0.15);
-            --glass-rim-top: rgba(255, 255, 255, 0.34);
-            --glass-rim-left: rgba(255, 255, 255, 0.24);
-            --text-primary: #f8fafc;
-            --text-secondary: #cbd5e1;
-            --text-muted: #94a3b8;
-            --accent-cyan: #38bdf8;
-            --accent-indigo: #818cf8;
-            --accent-emerald: #34d399;
-            --accent-amber: #fbbf24;
-            --accent-rose: #fb7185;
+            --bg-canvas: #f3f6fb;
+            --surface-white: rgba(255, 255, 255, 0.88);
+            --surface-elevated: rgba(255, 255, 255, 0.96);
+            --surface-spotlight: rgba(255, 255, 255, 0.98);
+            --border-subtle: rgba(226, 232, 240, 0.95);
+            --border-focus: #2563eb;
+            --ink-primary: #0f172a;
+            --ink-secondary: #475569;
+            --ink-muted: #64748b;
+            --brand-blue: #2563eb;
+            --brand-coral: #ff6b57;
+            --brand-amber: #f59e0b;
+            --brand-emerald: #10b981;
+            --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+            --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
         }
 
-        /* 1. Vibrant Multi-Orb Mesh Background so Frosted Glass Refracts Real Color */
+        /* Animations */
+        @keyframes cardSlideUp {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes barGrowVertical {
+            from {
+                transform: scaleY(0.08);
+            }
+            to {
+                transform: scaleY(1);
+            }
+        }
+
+        @keyframes statusDotPulse {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45);
+            }
+            50% {
+                box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.0);
+            }
+        }
+
+        /* App Canvas */
         .stApp {
-            background-color: #050814;
+            background-color: var(--bg-canvas) !important;
             background-image:
-                radial-gradient(circle at 12% 14%, rgba(14, 165, 233, 0.34) 0%, rgba(14, 165, 233, 0.0) 42%),
-                radial-gradient(circle at 86% 18%, rgba(124, 58, 237, 0.34) 0%, rgba(124, 58, 237, 0.0) 44%),
-                radial-gradient(circle at 78% 78%, rgba(16, 185, 129, 0.24) 0%, rgba(16, 185, 129, 0.0) 45%),
-                radial-gradient(circle at 18% 82%, rgba(219, 39, 119, 0.19) 0%, rgba(219, 39, 119, 0.0) 40%),
-                linear-gradient(135deg, #050814 0%, #0b132b 48%, #070b19 100%);
-            background-attachment: fixed;
-            color: var(--text-primary);
-            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+                radial-gradient(at 15% 8%, rgba(59, 130, 246, 0.07) 0px, transparent 45%),
+                radial-gradient(at 88% 12%, rgba(16, 185, 129, 0.06) 0px, transparent 42%),
+                radial-gradient(at 50% 90%, rgba(99, 102, 241, 0.05) 0px, transparent 50%) !important;
+            color: var(--ink-primary) !important;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
         }
 
-        /* Hide noisy Streamlit chrome */
         #MainMenu, footer, [data-testid="stToolbar"] {
             visibility: hidden;
             height: 0;
         }
         header[data-testid="stHeader"] {
             background: transparent !important;
+            height: 2rem !important;
         }
 
         .block-container {
-            padding-top: var(--space-4) !important;
-            padding-bottom: var(--space-6) !important;
-            max-width: 1360px !important;
+            padding-top: 1rem !important;
+            padding-bottom: 3rem !important;
+            padding-left: 2rem !important;
+            padding-right: 2rem !important;
+            max-width: 1440px !important;
         }
 
-        /* Frosted Sidebar */
+        /* Crisp White Sidebar */
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, rgba(15, 23, 42, 0.68) 0%, rgba(9, 13, 28, 0.78) 100%) !important;
-            backdrop-filter: blur(24px) saturate(190%) !important;
-            -webkit-backdrop-filter: blur(24px) saturate(190%) !important;
-            border-right: 1px solid var(--glass-rim) !important;
-            box-shadow: 8px 0 32px rgba(2, 6, 23, 0.55);
+            background: #ffffff !important;
+            border-right: 1px solid #e8eef5 !important;
+            box-shadow: 4px 0 24px rgba(15, 23, 42, 0.03) !important;
         }
 
-        /* Layer 1: Base Frosted Glass Panel */
+        [data-testid="stSidebar"] > div:first-child {
+            padding-top: 1rem !important;
+        }
+
+        /* Glass & Card Surfaces (Daylight Frosted) */
         .glass-layer-1 {
-            background: var(--glass-bg-layer-1);
-            backdrop-filter: blur(18px) saturate(180%);
-            -webkit-backdrop-filter: blur(18px) saturate(180%);
-            border: 1px solid var(--glass-rim);
-            border-top: 1px solid var(--glass-rim-top);
-            border-left: 1px solid var(--glass-rim-left);
-            border-radius: 16px;
-            padding: var(--space-4);
-            box-shadow:
-                0 12px 32px -8px rgba(2, 6, 23, 0.55),
-                inset 0 1px 0 0 rgba(255, 255, 255, 0.16);
+            background: var(--surface-white);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid var(--border-subtle);
+            border-radius: 14px;
+            padding: 18px 20px;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.03);
+            animation: cardSlideUp 320ms var(--ease-out-quint) both;
         }
 
-        /* Layer 2: Elevated Interactive Glass Card (Higher Translucency + Stronger Shadow) */
         .glass-layer-2 {
-            background: var(--glass-bg-layer-2);
-            backdrop-filter: blur(24px) saturate(195%);
-            -webkit-backdrop-filter: blur(24px) saturate(195%);
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            border-top: 1px solid rgba(255, 255, 255, 0.38);
-            border-left: 1px solid rgba(255, 255, 255, 0.28);
+            background: var(--surface-elevated);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid #e2e8f0;
             border-radius: 16px;
-            padding: var(--space-4);
-            box-shadow:
-                0 20px 44px -10px rgba(2, 6, 23, 0.70),
-                inset 0 1px 1px 0 rgba(255, 255, 255, 0.22);
-            transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
-                        box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1),
-                        border-color 180ms cubic-bezier(0.22, 1, 0.36, 1);
+            padding: 22px 24px;
+            box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+            transition: transform 200ms var(--ease-out-quint),
+                        box-shadow 200ms var(--ease-out-quint),
+                        border-color 200ms var(--ease-out-quint);
+            animation: cardSlideUp 360ms var(--ease-out-quint) both;
         }
 
         .glass-layer-2:hover {
-            transform: translateY(-2px);
-            border-color: rgba(56, 189, 248, 0.48);
-            box-shadow:
-                0 26px 54px -10px rgba(2, 6, 23, 0.82),
-                0 0 24px rgba(56, 189, 248, 0.16),
-                inset 0 1px 1px 0 rgba(255, 255, 255, 0.30);
+            transform: translateY(-3px);
+            border-color: #cbd5e1;
+            box-shadow: 0 12px 28px -4px rgba(15, 23, 42, 0.08), 0 4px 10px -2px rgba(37, 99, 235, 0.05);
         }
 
-        /* Layer 3: Spotlight Foreground Glass (Closest to User) */
         .glass-layer-3 {
-            background: var(--glass-bg-layer-3);
-            backdrop-filter: blur(28px) saturate(210%);
-            -webkit-backdrop-filter: blur(28px) saturate(210%);
-            border: 1px solid rgba(56, 189, 248, 0.34);
-            border-top: 1px solid rgba(255, 255, 255, 0.45);
-            border-left: 1px solid rgba(255, 255, 255, 0.32);
-            border-radius: 20px;
-            padding: var(--space-4);
-            box-shadow:
-                0 28px 60px -12px rgba(2, 6, 23, 0.85),
-                0 0 32px rgba(56, 189, 248, 0.18),
-                inset 0 1px 2px 0 rgba(255, 255, 255, 0.28);
+            background: var(--surface-spotlight);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(37, 99, 235, 0.28);
+            border-radius: 16px;
+            padding: 22px 24px;
+            box-shadow: 0 10px 30px -4px rgba(37, 99, 235, 0.10), 0 4px 12px rgba(15, 23, 42, 0.04);
+            transition: transform 200ms var(--ease-out-quint), box-shadow 200ms var(--ease-out-quint);
+            animation: cardSlideUp 380ms var(--ease-out-quint) both;
         }
 
-        /* Fluid Typography & Tabular Figures (ui-scale-architecture) */
-        .hero-title {
-            font-size: clamp(1.375rem, 2.2vw, 2rem);
-            font-weight: 700;
-            letter-spacing: -0.025em;
-            line-height: 1.2;
-            color: var(--text-primary);
-            margin: 0;
+        /* Form Controls & Selectboxes */
+        div[data-baseweb="select"] > div,
+        div[data-baseweb="input"] > div {
+            min-height: 44px !important;
+            background-color: #ffffff !important;
+            border: 1px solid #dbe3ee !important;
+            border-radius: 10px !important;
+            color: #0f172a !important;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03) !important;
+            transition: border-color 160ms var(--ease-out-quart), box-shadow 160ms var(--ease-out-quart) !important;
         }
 
-        .section-heading {
-            font-size: clamp(1.125rem, 1.5vw, 1.35rem);
-            font-weight: 700;
-            letter-spacing: -0.015em;
-            line-height: 1.3;
-            color: var(--text-primary);
-            margin: 0;
+        div[data-baseweb="select"] > div:hover,
+        div[data-baseweb="input"] > div:hover {
+            border-color: #94a3b8 !important;
         }
 
-        .spotlight-value {
-            font-size: clamp(1.5rem, 2.4vw, 2.25rem);
-            font-weight: 800;
-            letter-spacing: -0.03em;
-            line-height: 1.15;
-            font-variant-numeric: tabular-nums;
-            color: #ffffff;
-            margin: 6px 0;
+        div[data-baseweb="select"] > div:focus-within,
+        div[data-baseweb="input"] > div:focus-within {
+            border-color: #2563eb !important;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14) !important;
         }
 
-        .spotlight-label {
-            font-size: 0.8125rem;
-            font-weight: 600;
-            color: var(--text-secondary);
-            letter-spacing: 0.01em;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .spotlight-caption {
-            font-size: 0.8125rem;
-            color: var(--text-muted);
-            line-height: 1.45;
-        }
-
-        /* Touch targets & Controls >= 48px (ui-scale-architecture) */
-        .stButton > button {
-            min-height: 48px !important;
-            background: linear-gradient(135deg, rgba(14, 165, 233, 0.88) 0%, rgba(79, 70, 229, 0.88) 100%) !important;
-            backdrop-filter: blur(16px) !important;
-            color: #ffffff !important;
-            border: 1px solid rgba(255, 255, 255, 0.28) !important;
-            border-top: 1px solid rgba(255, 255, 255, 0.48) !important;
-            border-radius: 12px !important;
-            padding: 0.625rem 1.5rem !important;
+        .stSelectbox label, .stTextInput label, .stNumberInput label {
+            color: #334155 !important;
             font-weight: 600 !important;
-            font-size: 0.9375rem !important;
-            box-shadow: 0 12px 28px -6px rgba(14, 165, 233, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
-            transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 160ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+            font-size: 0.82rem !important;
+            margin-bottom: 4px !important;
+        }
+
+        /* Clean Primary Action Button (Matches the clean blue button in the inspiration UI) */
+        .stButton > button {
+            min-height: 44px !important;
+            background: #2563eb !important;
+            color: #ffffff !important;
+            border: 1px solid #1d4ed8 !important;
+            border-radius: 10px !important;
+            padding: 0.5rem 1.25rem !important;
+            font-weight: 600 !important;
+            font-size: 0.875rem !important;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.22) !important;
+            transition: transform 150ms var(--ease-out-quint),
+                        background-color 150ms var(--ease-out-quint),
+                        box-shadow 150ms var(--ease-out-quint) !important;
         }
 
         .stButton > button:hover {
-            transform: translateY(-2px) !important;
-            box-shadow: 0 16px 36px -6px rgba(14, 165, 233, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.45) !important;
+            background: #1d4ed8 !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.30) !important;
         }
 
-        .stButton > button:focus-visible {
-            outline: 2px solid #38bdf8 !important;
-            outline-offset: 2px !important;
+        .stButton > button:active {
+            transform: scale(0.98) !important;
         }
 
         .stDownloadButton > button {
-            min-height: 48px !important;
-            background: rgba(255, 255, 255, 0.08) !important;
-            backdrop-filter: blur(16px) !important;
-            color: #f8fafc !important;
-            border: 1px solid rgba(255, 255, 255, 0.22) !important;
-            border-radius: 12px !important;
+            min-height: 42px !important;
+            background: #ffffff !important;
+            color: #1e293b !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 10px !important;
             font-weight: 600 !important;
+            font-size: 0.84rem !important;
+            transition: all 150ms var(--ease-out-quart) !important;
         }
 
-        div[data-baseweb="select"] > div,
-        div[data-baseweb="input"] > div {
-            min-height: 48px !important;
-            background: rgba(15, 23, 42, 0.62) !important;
-            backdrop-filter: blur(16px) !important;
-            border: 1px solid rgba(255, 255, 255, 0.18) !important;
-            border-radius: 12px !important;
-            color: #f8fafc !important;
+        .stDownloadButton > button:hover {
+            background: #f8fafc !important;
+            border-color: #2563eb !important;
+            color: #2563eb !important;
         }
 
-        /* Glass Tabs */
+        /* Pill Tabs (Matches the clean green/white pill tabs in the inspiration image) */
         .stTabs [data-baseweb="tab-list"] {
-            gap: 8px;
-            background: rgba(15, 23, 42, 0.48);
-            backdrop-filter: blur(16px);
-            padding: 6px;
-            border-radius: 14px;
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            gap: 6px;
+            background: #ffffff;
+            padding: 5px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.02);
         }
 
         .stTabs [data-baseweb="tab"] {
-            min-height: 44px;
-            padding: 8px 20px;
-            border-radius: 10px;
-            color: #cbd5e1;
+            min-height: 38px;
+            padding: 6px 16px;
+            border-radius: 8px;
+            color: #64748b !important;
             font-weight: 600;
-            font-size: 0.9375rem;
+            font-size: 0.84rem;
             border: none !important;
+            transition: all 180ms var(--ease-out-quart);
         }
 
         .stTabs [aria-selected="true"] {
-            background: linear-gradient(135deg, rgba(56, 189, 248, 0.22) 0%, rgba(99, 102, 241, 0.22) 100%) !important;
+            background: #10b981 !important;
             color: #ffffff !important;
-            border: 1px solid rgba(56, 189, 248, 0.38) !important;
-            box-shadow: 0 4px 14px rgba(14, 165, 233, 0.20);
+            box-shadow: 0 3px 10px rgba(16, 185, 129, 0.25);
         }
 
-        /* Metadata Chips with Clear Visual Separation */
+        .stTabs [data-baseweb="tab-panel"] {
+            animation: cardSlideUp 260ms var(--ease-out-quint) both;
+            padding-top: 16px !important;
+        }
+
+        /* Chips & Domain Highlights */
         .glass-chip {
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            padding: 5px 12px;
+            padding: 4px 11px;
             border-radius: 999px;
-            font-size: 0.8125rem;
-            font-weight: 500;
-            background: rgba(255, 255, 255, 0.07);
-            border: 1px solid rgba(255, 255, 255, 0.14);
-            color: #e2e8f0;
-            margin-right: 8px;
-            margin-bottom: 6px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            color: #334155;
+            margin-right: 6px;
+            margin-bottom: 4px;
         }
 
         .highlight-term {
-            background: rgba(56, 189, 248, 0.16);
-            color: #7dd3fc;
-            border: 1px solid rgba(56, 189, 248, 0.32);
-            padding: 1px 7px;
-            border-radius: 6px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+            padding: 1px 6px;
+            border-radius: 5px;
             font-weight: 600;
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.88em;
+            font-size: 0.86em;
+        }
+
+        /* Animated vertical chart bars */
+        .v-bar-fill {
+            transform-origin: bottom;
+            animation: barGrowVertical 650ms var(--ease-out-quint) both;
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -384,31 +403,185 @@ def get_glassmorphism_stylesheet() -> str:
     """
 
 
+def render_brand_sidebar_header() -> str:
+    """Renders the compact geometric logo and app title in the top-left of the sidebar."""
+    logo_svg = get_svg_icon("brand-mark", size=24, color="#2563eb")
+    return _compact_html(f"""
+    <div style="display:flex;align-items:center;gap:12px;padding:4px 4px 20px 4px;border-bottom:1px solid #f1f5f9;margin-bottom:18px;">
+        <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border:1px solid #bfdbfe;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(37,99,235,0.12);">
+            {logo_svg}
+        </div>
+        <div>
+            <div style="font-size:1.02rem;font-weight:800;color:#0f172a;letter-spacing:-0.02em;line-height:1.15;">GisMarket</div>
+            <div style="font-size:0.74rem;font-weight:600;color:#64748b;letter-spacing:0.01em;">Intelligence AI</div>
+        </div>
+    </div>
+    """)
+
+
+def render_top_utility_bar(
+    municipality: str,
+    voivodeship: str,
+    ollama_ok: bool,
+    total_tenders: int,
+    has_lockin: bool,
+) -> str:
+    """Renders a clean top navbar with breadcrumbs on the left and status pills on the right."""
+    home_svg = get_svg_icon("home", size=16, color="#2563eb")
+    bell_svg = get_svg_icon("bell", size=16, color="#f59e0b" if has_lockin else "#10b981")
+    safe_muni = html.escape(municipality)
+    safe_voiv = html.escape(voivodeship)
+
+    alert_text = (
+        'Wykryto <strong style="color:#dc2626;">2 ryzyka KIO</strong> w SWZ'
+        if has_lockin
+        else 'Dokumentacja <strong style="color:#10b981;">zgodna z PZP</strong>'
+    )
+    dot_color = "#10b981" if ollama_ok else "#f59e0b"
+    env_label = "Ollama AI + pgvector" if ollama_ok else "Tryb deterministyczny + pgvector"
+
+    return _compact_html(f"""
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;padding:6px 2px;">
+        <div style="display:flex;align-items:center;gap:8px;font-size:0.86rem;color:#64748b;font-weight:500;">
+            {home_svg}
+            <span>Panel główny</span>
+            <span style="color:#cbd5e1;">&rsaquo;</span>
+            <span>Audyt zamówień GIS</span>
+            <span style="color:#cbd5e1;">&rsaquo;</span>
+            <span style="color:#0f172a;font-weight:700;">{safe_muni} ({safe_voiv})</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div style="display:inline-flex;align-items:center;gap:8px;background:#ffffff;border:1px solid #e2e8f0;padding:7px 14px;border-radius:999px;font-size:0.8rem;color:#334155;box-shadow:0 2px 6px rgba(15,23,42,0.03);">
+                <span>{alert_text}</span>
+                {bell_svg}
+            </div>
+            <div style="display:inline-flex;align-items:center;gap:8px;background:#ffffff;border:1px solid #e2e8f0;padding:7px 14px;border-radius:999px;font-size:0.8rem;color:#0f172a;font-weight:600;box-shadow:0 2px 6px rgba(15,23,42,0.03);">
+                <span style="width:8px;height:8px;border-radius:50%;background:{dot_color};animation:statusDotPulse 2.4s infinite;display:inline-block;"></span>
+                <span>{env_label}</span>
+                <span style="background:#eff6ff;color:#2563eb;padding:1px 7px;border-radius:999px;font-size:0.72rem;font-weight:700;">{total_tenders} SWZ</span>
+            </div>
+        </div>
+    </div>
+    """)
+
+
+def render_kpi_stat_card(
+    value: str,
+    label: str,
+    sublabel: str,
+    icon_name: str,
+    color_hex: str,
+    ring_bg: str,
+    stagger_index: int = 0,
+) -> str:
+    """Renders a clean horizontal KPI card with a circular colored icon badge (inspired by modern SaaS dashboards)."""
+    svg = get_svg_icon(icon_name, size=24, color="#ffffff")
+    delay_ms = stagger_index * 55
+    return _compact_html(f"""
+    <div class="glass-layer-2" style="padding:20px 22px;display:flex;align-items:center;gap:18px;animation-delay:{delay_ms}ms;">
+        <div style="width:54px;height:54px;border-radius:50%;background:{color_hex};box-shadow:0 0 0 6px {ring_bg}, 0 6px 16px {ring_bg};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            {svg}
+        </div>
+        <div style="min-width:0;">
+            <div style="font-size:1.55rem;font-weight:800;color:{color_hex};line-height:1.15;letter-spacing:-0.025em;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                {html.escape(value)}
+            </div>
+            <div style="font-size:0.84rem;font-weight:700;color:#1e293b;margin-top:3px;">
+                {html.escape(label)}
+            </div>
+            <div style="font-size:0.74rem;color:#64748b;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                {html.escape(sublabel)}
+            </div>
+        </div>
+    </div>
+    """)
+
+
+def render_risk_profile_panel(has_lockin: bool, has_penalties: bool, faithfulness: float) -> str:
+    """Renders the right-hand vertical bar chart card with an overall score summary at the bottom."""
+    b1 = 92 if has_lockin else 22
+    b2 = 86 if has_penalties else 28
+    b3 = 64
+    b4 = int(round(faithfulness * 100))
+    overall_score = int(round((b1 + b2 + b3) / 3))
+
+    bars = [
+        ("Format", b1, "#3b82f6"),
+        ("Kary", b2, "#6366f1"),
+        ("Kadra", b3, "#8b5cf6"),
+        ("RAGAS", b4, "#10b981"),
+    ]
+    bars_html = ""
+    for idx, (lbl, pct, col) in enumerate(bars):
+        delay = idx * 80
+        bars_html += (
+            f"<div style='display:flex;flex-direction:column;align-items:center;gap:8px;flex:1;'>"
+            f"<div style='height:150px;width:28px;background:#f1f5f9;border-radius:8px;display:flex;align-items:flex-end;overflow:hidden;padding:2px;'>"
+            f"<div class='v-bar-fill' style='width:100%;height:{pct}%;background:{col};border-radius:6px;animation-delay:{delay}ms;'></div>"
+            f"</div>"
+            f"<span style='font-size:0.75rem;font-weight:600;color:#64748b;'>{lbl}</span>"
+            f"<span style='font-size:0.72rem;font-weight:700;color:#0f172a;font-variant-numeric:tabular-nums;'>{pct}%</span>"
+            f"</div>"
+        )
+
+    verdict_note = (
+        "Wysoki poziom restrykcyjności SWZ (wymagany wniosek z art. 135 PZP)"
+        if has_lockin
+        else "Standardowy profil wymagań przetargowych"
+    )
+
+    return _compact_html(f"""
+    <div class="glass-layer-2" style="height:100%;display:flex;flex-direction:column;justify-content:space-between;">
+        <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+                <span style="font-size:1.02rem;font-weight:800;color:#0f172a;">Profil ryzyka SWZ</span>
+                <span style="font-size:0.74rem;font-weight:700;color:#2563eb;background:#eff6ff;padding:4px 10px;border-radius:999px;">Indeks barier</span>
+            </div>
+            <div style="display:flex;justify-content:space-around;align-items:flex-end;gap:12px;padding:14px 8px 18px 8px;border-bottom:1px solid #f1f5f9;">
+                {bars_html}
+            </div>
+        </div>
+        <div style="text-align:center;padding-top:18px;">
+            <div style="font-size:2.1rem;font-weight:800;color:#0f172a;letter-spacing:-0.03em;line-height:1.1;font-variant-numeric:tabular-nums;">
+                {overall_score} <span style="font-size:1rem;font-weight:600;color:#94a3b8;">/ 100</span>
+            </div>
+            <div style="font-size:0.8rem;color:#64748b;margin-top:6px;line-height:1.4;">
+                {verdict_note}
+            </div>
+            <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:14px;">
+                <span class="glass-chip" style="background:#fff1f2;color:#e11d48;border-color:#fecdd3;">Geobid: EWMAPA (.str)</span>
+                <span class="glass-chip" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe;">Geo-System: iMPA</span>
+            </div>
+        </div>
+    </div>
+    """)
+
+
 def render_red_flag_badge(flag_type: str) -> str:
-    """Renders a high-contrast glassmorphic warning pill with custom SVG icon."""
+    """Renders a crisp semantic warning pill with custom SVG icon."""
     configs: Dict[str, Dict[str, str]] = {
         "vendor_lockin": {
-            "label": "Blokada Vendor Lock-in (.str / EWMAPA)",
-            "bg": "rgba(229, 62, 62, 0.20)",
-            "border": "rgba(252, 129, 129, 0.45)",
-            "color": "#fecaca",
-            "icon_color": "#f87171",
+            "label": "Vendor Lock-in (.str / EWMAPA)",
+            "bg": "#fff1f2",
+            "border": "#fecdd3",
+            "color": "#be123c",
+            "icon_color": "#e11d48",
             "icon": "shield-alert",
         },
         "asymetria_kar": {
             "label": "Asymetria kar umownych (2% dziennie bez limitu)",
-            "bg": "rgba(245, 158, 11, 0.20)",
-            "border": "rgba(251, 191, 36, 0.45)",
-            "color": "#fde68a",
-            "icon_color": "#fbbf24",
+            "bg": "#fffbeb",
+            "border": "#fde68a",
+            "color": "#b45309",
+            "icon_color": "#d97706",
             "icon": "scale",
         },
         "krotki_termin": {
-            "label": "Nierealny termin realizacji zamówienia",
-            "bg": "rgba(139, 92, 246, 0.20)",
-            "border": "rgba(196, 181, 253, 0.45)",
-            "color": "#ddd6fe",
-            "icon_color": "#a78bfa",
+            "label": "Krótki termin realizacji zamówienia",
+            "bg": "#f5f3ff",
+            "border": "#ddd6fe",
+            "color": "#6d28d9",
+            "icon_color": "#7c3aed",
             "icon": "layers",
         },
     }
@@ -417,17 +590,17 @@ def render_red_flag_badge(flag_type: str) -> str:
         flag_type.lower(),
         {
             "label": f"Ryzyko SWZ: {flag_type}",
-            "bg": "rgba(148, 163, 184, 0.18)",
-            "border": "rgba(203, 213, 225, 0.35)",
-            "color": "#f1f5f9",
-            "icon_color": "#cbd5e1",
+            "bg": "#f1f5f9",
+            "border": "#cbd5e1",
+            "color": "#334155",
+            "icon_color": "#475569",
             "icon": "shield-alert",
         },
     )
 
     svg = get_svg_icon(cfg["icon"], size=16, color=cfg["icon_color"])
     return _compact_html(f"""
-    <span style="display:inline-flex;align-items:center;gap:8px;background-color:{cfg['bg']};color:{cfg['color']};border:1px solid {cfg['border']};border-top:1px solid rgba(255,255,255,0.35);padding:8px 14px;border-radius:999px;font-weight:600;font-size:0.84rem;margin-right:10px;margin-bottom:8px;backdrop-filter:blur(14px);box-shadow:0 6px 18px rgba(2,6,23,0.35);">
+    <span style="display:inline-flex;align-items:center;gap:7px;background-color:{cfg['bg']};color:{cfg['color']};border:1px solid {cfg['border']};padding:6px 13px;border-radius:999px;font-weight:600;font-size:0.8rem;margin-right:8px;margin-bottom:6px;">
         {svg}
         <span>{cfg['label']}</span>
     </span>
@@ -437,20 +610,20 @@ def render_red_flag_badge(flag_type: str) -> str:
 def render_citation_box(citation_text: str) -> str:
     """Renders a concise verified SWZ/OPZ document reference pill."""
     escaped = html.escape(citation_text.strip(" []"))
-    svg = get_svg_icon("file-check", size=20, color="#38bdf8")
+    svg = get_svg_icon("file-check", size=20, color="#2563eb")
     return _compact_html(f"""
-    <div class="glass-layer-1" style="padding:14px 18px;margin:8px 0;display:flex;align-items:center;gap:12px;border-radius:12px;">
+    <div class="glass-layer-1" style="padding:12px 16px;margin:8px 0;display:flex;align-items:center;gap:12px;border-radius:12px;">
         {svg}
-        <div style="font-size:0.9rem;line-height:1.5;color:#f1f5f9;">
-            <span style="color:#7dd3fc;font-weight:600;margin-right:6px;">Źródło dowodowe SWZ/OPZ:</span>
-            <span style="color:#e2e8f0;font-family:'JetBrains Mono',monospace;font-size:0.85rem;">{escaped}</span>
+        <div style="font-size:0.86rem;line-height:1.45;color:#1e293b;">
+            <span style="color:#2563eb;font-weight:700;margin-right:6px;">Źródło dowodowe SWZ/OPZ:</span>
+            <span style="color:#334155;font-family:'JetBrains Mono',monospace;font-size:0.82rem;">{escaped}</span>
         </div>
     </div>
     """)
 
 
 def render_competitor_matrix(competitors: List[Dict[str, str]]) -> str:
-    """Renders an HTML glassmorphic table displaying regional GIS competitors."""
+    """Renders a clean light-mode table displaying regional GIS competitors."""
     if not competitors:
         return "<div class='glass-layer-1'>Brak zidentyfikowanych podmiotów konkurencyjnych.</div>"
 
@@ -460,21 +633,21 @@ def render_competitor_matrix(competitors: List[Dict[str, str]]) -> str:
         product = html.escape(comp.get("product", "-"))
         advantage = html.escape(comp.get("advantage", "-"))
         rows_html += (
-            f"<tr style='border-bottom:1px solid rgba(255,255,255,0.08);'>"
-            f"<td style='padding:14px 16px;font-weight:600;color:#f8fafc;'>{name}</td>"
-            f"<td style='padding:14px 16px;color:#38bdf8;font-family:\"JetBrains Mono\",monospace;font-size:0.85rem;'>{product}</td>"
-            f"<td style='padding:14px 16px;color:#cbd5e1;'>{advantage}</td>"
+            f"<tr style='border-bottom:1px solid #f1f5f9;'>"
+            f"<td style='padding:13px 16px;font-weight:700;color:#0f172a;'>{name}</td>"
+            f"<td style='padding:13px 16px;'><span style='background:#eff6ff;color:#2563eb;padding:3px 9px;border-radius:6px;font-family:\"JetBrains Mono\",monospace;font-size:0.8rem;font-weight:600;'>{product}</span></td>"
+            f"<td style='padding:13px 16px;color:#475569;'>{advantage}</td>"
             f"</tr>"
         )
 
     return _compact_html(f"""
-    <div class="glass-layer-2" style="padding:0;overflow:hidden;margin:12px 0;">
-        <table style="width:100%;border-collapse:collapse;font-size:0.92rem;text-align:left;">
+    <div class="glass-layer-2" style="padding:0;overflow:hidden;margin:8px 0;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.88rem;text-align:left;">
             <thead>
-                <tr style="background:rgba(255,255,255,0.06);color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.14);font-size:0.78rem;text-transform:uppercase;letter-spacing:0.05em;">
-                    <th style="padding:14px 16px;">Podmiot konkurencyjny</th>
-                    <th style="padding:14px 16px;">System bazodanowy GIS</th>
-                    <th style="padding:14px 16px;">Przewaga w postępowaniu</th>
+                <tr style="background:#f8fafc;color:#64748b;border-bottom:1px solid #e2e8f0;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.04em;">
+                    <th style="padding:12px 16px;">Podmiot konkurencyjny</th>
+                    <th style="padding:12px 16px;">System bazodanowy GIS</th>
+                    <th style="padding:12px 16px;">Przewaga w postępowaniu</th>
                 </tr>
             </thead>
             <tbody>{rows_html}</tbody>
@@ -484,30 +657,30 @@ def render_competitor_matrix(competitors: List[Dict[str, str]]) -> str:
 
 
 def render_kio_warning(risk_level: str) -> str:
-    """Renders a high-visibility glass alert indicating KIO appeal grounds."""
+    """Renders a clean semantic alert indicating KIO appeal grounds."""
     level = risk_level.upper()
     if level == "HIGH":
-        bg = "linear-gradient(135deg, rgba(220, 38, 38, 0.22) 0%, rgba(153, 27, 27, 0.12) 100%)"
-        border = "rgba(248, 113, 113, 0.45)"
-        color = "#fecaca"
-        icon_color = "#f87171"
+        bg = "#fff1f2"
+        border = "#fecdd3"
+        color = "#9f1239"
+        icon_color = "#e11d48"
         text = "Ryzyko odwołania do KIO: WYSOKIE (podstawa prawna: art. 16 oraz art. 99 ustawy PZP)"
     elif level == "MEDIUM":
-        bg = "linear-gradient(135deg, rgba(217, 119, 6, 0.22) 0%, rgba(146, 64, 14, 0.12) 100%)"
-        border = "rgba(251, 191, 36, 0.45)"
-        color = "#fde68a"
-        icon_color = "#fbbf24"
+        bg = "#fffbeb"
+        border = "#fde68a"
+        color = "#92400e"
+        icon_color = "#d97706"
         text = "Ryzyko odwołania do KIO: ŚREDNIE (zalecane pytanie o równoważność formatów GML/GeoTIFF)"
     else:
-        bg = "linear-gradient(135deg, rgba(16, 185, 129, 0.20) 0%, rgba(6, 95, 70, 0.12) 100%)"
-        border = "rgba(52, 211, 153, 0.42)"
-        color = "#a7f3d0"
-        icon_color = "#34d399"
+        bg = "#ecfdf5"
+        border = "#a7f3d0"
+        color = "#065f46"
+        icon_color = "#10b981"
         text = "Ryzyko odwołania do KIO: NISKIE (opis przedmiotu zamówienia dopuszcza standardy otwarte)"
 
-    svg = get_svg_icon("scale", size=24, color=icon_color)
+    svg = get_svg_icon("scale", size=20, color=icon_color)
     return _compact_html(f"""
-    <div style="background:{bg};color:{color};border:1px solid {border};border-top:1px solid rgba(255,255,255,0.35);padding:16px 20px;border-radius:14px;font-weight:600;font-size:0.95rem;margin:12px 0;display:flex;align-items:center;gap:14px;backdrop-filter:blur(20px);box-shadow:0 14px 32px rgba(2,6,23,0.45);">
+    <div style="background:{bg};color:{color};border:1px solid {border};padding:12px 16px;border-radius:12px;font-weight:600;font-size:0.88rem;margin:8px 0 14px 0;display:flex;align-items:center;gap:12px;">
         {svg}
         <span>{text}</span>
     </div>
@@ -534,7 +707,7 @@ def render_tender_card(
     status: str = "ACTIVE",
     is_selected: bool = False,
 ) -> str:
-    """Renders a multi-layered glassmorphic tender card with clear chip separation."""
+    """Renders a clean daylight card with metadata chips."""
     safe_title = html.escape(str(title))
     safe_muni = html.escape(str(municipality))
     safe_voiv = html.escape(str(voivodeship))
@@ -544,45 +717,115 @@ def render_tender_card(
 
     if budget_pln and budget_pln > 0:
         budget_str = f"{budget_pln:,.0f} PLN".replace(",", " ")
-        budget_color = "#34d399"
+        budget_color = "#059669"
     else:
         budget_str = "Wg kosztorysu SWZ"
-        budget_color = "#94a3b8"
+        budget_color = "#64748b"
 
-    building_svg = get_svg_icon("building", size=16, color="#38bdf8")
-    pin_svg = get_svg_icon("map-pin", size=16, color="#818cf8")
+    building_svg = get_svg_icon("building", size=16, color="#2563eb")
+    pin_svg = get_svg_icon("map-pin", size=16, color="#6366f1")
     wallet_svg = get_svg_icon("wallet", size=16, color=budget_color)
 
     layer_class = "glass-layer-3" if is_selected else "glass-layer-2"
     selected_badge = (
-        '<span style="background:rgba(56,189,248,0.22);color:#7dd3fc;border:1px solid rgba(56,189,248,0.45);'
-        'padding:4px 10px;border-radius:999px;font-size:0.75rem;font-weight:700;">Wybrane do analizy</span>'
+        '<span style="background:#2563eb;color:#ffffff;padding:4px 11px;border-radius:999px;font-size:0.74rem;font-weight:700;">W analizie</span>'
         if is_selected
-        else f'<span style="background:rgba(16,185,129,0.16);color:#6ee7b7;border:1px solid rgba(52,211,153,0.35);padding:4px 10px;border-radius:999px;font-size:0.75rem;font-weight:600;">{status_pl}</span>'
+        else f'<span style="background:#10b981;color:#ffffff;padding:4px 11px;border-radius:999px;font-size:0.74rem;font-weight:600;">{status_pl}</span>'
     )
 
     return _compact_html(f"""
-    <div class="{layer_class}" style="margin-bottom:16px;" data-ocds-id="{safe_full_id}">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:12px;">
-            <div style="font-size:1.05rem;font-weight:700;color:#f8fafc;line-height:1.4;">{safe_title}</div>
+    <div class="{layer_class}" style="margin-bottom:12px;padding:16px 20px;" data-ocds-id="{safe_full_id}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:10px;">
+            <div style="font-size:0.96rem;font-weight:700;color:#0f172a;line-height:1.4;">{safe_title}</div>
             {selected_badge}
         </div>
-        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
-            <span class="glass-chip" title="{safe_full_id}" style="font-family:'JetBrains Mono',monospace;color:#7dd3fc;">
-                Ref: {short_id}
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;">
+            <span class="glass-chip" title="{safe_full_id}" style="font-family:'JetBrains Mono',monospace;color:#2563eb;background:#eff6ff;border-color:#bfdbfe;">
+                {short_id}
             </span>
             <span class="glass-chip">
                 {building_svg}
-                <span>Zamawiający: <strong style="color:#f8fafc;">{safe_muni}</strong></span>
+                <span>Zamawiający: <strong style="color:#0f172a;">{safe_muni}</strong></span>
             </span>
             <span class="glass-chip">
                 {pin_svg}
-                <span>Województwo: <strong style="color:#f8fafc;">{safe_voiv}</strong></span>
+                <span>Województwo: <strong style="color:#0f172a;">{safe_voiv}</strong></span>
             </span>
-            <span class="glass-chip" style="border-color:rgba(52,211,153,0.28);">
+            <span class="glass-chip">
                 {wallet_svg}
                 <span>Budżet: <strong style="color:{budget_color};font-variant-numeric:tabular-nums;">{budget_str}</strong></span>
             </span>
+        </div>
+    </div>
+    """)
+
+
+def render_procurements_table(rows: List[Dict[str, Any]], selected_id: str) -> str:
+    """Renders a modern SaaS table card (inspired by the Orders table in the reference dashboard)."""
+    check_svg = get_svg_icon("check-circle", size=16, color="#10b981")
+    building_svg = get_svg_icon("building", size=16, color="#2563eb")
+
+    tbody = ""
+    for row in rows:
+        row_id = str(row.get("ID", ""))
+        short_id = html.escape(format_short_ocds_id(row_id))
+        muni = html.escape(str(row.get("Zamawiający", "")))
+        title = html.escape(str(row.get("Tytuł", "")))
+        voiv = html.escape(str(row.get("Województwo", "")))
+        budget_val = float(row.get("Budżet PLN", 0.0) or 0.0)
+        budget_str = f"{budget_val:,.0f} PLN".replace(",", " ") if budget_val > 0 else "Wg SWZ"
+
+        is_sel = row_id == selected_id
+        row_bg = "background:#f8fafc;" if is_sel else ""
+        status_pill = (
+            "<span style='background:#2563eb;color:#ffffff;padding:4px 12px;border-radius:6px;font-size:0.74rem;font-weight:700;display:inline-block;'>W analizie</span>"
+            if is_sel
+            else "<span style='background:#10b981;color:#ffffff;padding:4px 12px;border-radius:6px;font-size:0.74rem;font-weight:700;display:inline-block;'>Aktywne</span>"
+        )
+
+        tbody += (
+            f"<tr style='border-bottom:1px solid #f1f5f9;{row_bg}transition:background 150ms ease;'>"
+            f"<td style='padding:14px 16px;'>"
+            f"<div style='display:flex;align-items:center;gap:10px;'>"
+            f"<div style='width:34px;height:34px;border-radius:50%;background:#eff6ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;'>{building_svg}</div>"
+            f"<span style='font-weight:700;color:#0f172a;font-size:0.86rem;'>{muni}</span>"
+            f"</div>"
+            f"</td>"
+            f"<td style='padding:14px 16px;color:#334155;font-size:0.85rem;font-weight:500;max-width:420px;'>{title}</td>"
+            f"<td style='padding:14px 16px;font-family:\"JetBrains Mono\",monospace;font-size:0.78rem;color:#64748b;'>{short_id}</td>"
+            f"<td style='padding:14px 16px;color:#475569;font-size:0.84rem;'>{voiv}</td>"
+            f"<td style='padding:14px 16px;font-weight:700;color:#0f172a;font-variant-numeric:tabular-nums;font-size:0.86rem;'>{budget_str}</td>"
+            f"<td style='padding:14px 16px;'>"
+            f"<span style='display:inline-flex;align-items:center;gap:6px;color:#10b981;font-weight:600;font-size:0.8rem;'>{check_svg}<span>Zindeksowano</span></span>"
+            f"</td>"
+            f"<td style='padding:14px 16px;text-align:right;'>{status_pill}</td>"
+            f"</tr>"
+        )
+
+    return _compact_html(f"""
+    <div class="glass-layer-2" style="padding:22px 24px;margin-top:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div>
+                <h3 style="margin:0;font-size:1.08rem;font-weight:800;color:#0f172a;">Postępowania przetargowe w bazie</h3>
+                <div style="font-size:0.8rem;color:#64748b;margin-top:2px;">Zestawienie ogłoszeń BZP oraz zindeksowanych specyfikacji SWZ/OPZ</div>
+            </div>
+            <span style="font-size:0.78rem;font-weight:700;color:#2563eb;background:#eff6ff;padding:5px 12px;border-radius:999px;">Łącznie: {len(rows)}</span>
+        </div>
+        <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;text-align:left;">
+                <thead>
+                    <tr style="border-bottom:1px solid #e2e8f0;color:#64748b;font-size:0.76rem;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;">
+                        <th style="padding:10px 16px;">Zamawiający</th>
+                        <th style="padding:10px 16px;">Przedmiot zamówienia</th>
+                        <th style="padding:10px 16px;">Nr ref.</th>
+                        <th style="padding:10px 16px;">Województwo</th>
+                        <th style="padding:10px 16px;">Szacunek</th>
+                        <th style="padding:10px 16px;">Status RAG</th>
+                        <th style="padding:10px 16px;text-align:right;">Etap</th>
+                    </tr>
+                </thead>
+                <tbody>{tbody}</tbody>
+            </table>
         </div>
     </div>
     """)
@@ -612,26 +855,26 @@ def highlight_domain_terms(text: str) -> str:
     for kw in keywords:
         escaped = re.sub(
             rf"({kw})",
-            r'<strong style="color:#7dd3fc;font-weight:700;">\1</strong>',
+            r'<strong style="color:#2563eb;font-weight:700;">\1</strong>',
             escaped,
             flags=re.IGNORECASE,
         )
     return escaped
 
 
-def render_insight_section_card(title: str, body: str, icon_name: str, accent_color: str = "#38bdf8") -> str:
-    """Renders a single structured audit section as an elevated frosted-glass card."""
-    svg = get_svg_icon(icon_name, size=24, color=accent_color)
+def render_insight_section_card(title: str, body: str, icon_name: str, accent_color: str = "#2563eb") -> str:
+    """Renders a single structured audit section as a crisp light-mode card."""
+    svg = get_svg_icon(icon_name, size=20, color=accent_color)
     formatted_body = highlight_domain_terms(body.strip()) if body.strip() else "Brak dodatkowych uwag w tej sekcji."
     return _compact_html(f"""
-    <div class="glass-layer-2" style="height:100%;margin-bottom:16px;">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.10);">
-            <div style="width:40px;height:40px;border-radius:10px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.16);display:flex;align-items:center;justify-content:center;">
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 18px;margin-bottom:12px;height:100%;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <div style="width:32px;height:32px;border-radius:8px;background:#ffffff;border:1px solid #e2e8f0;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(15,23,42,0.04);">
                 {svg}
             </div>
-            <h3 style="margin:0;font-size:1.05rem;font-weight:700;color:#f8fafc;letter-spacing:-0.01em;">{html.escape(title)}</h3>
+            <h4 style="margin:0;font-size:0.92rem;font-weight:700;color:#0f172a;">{html.escape(title)}</h4>
         </div>
-        <div style="font-size:0.95rem;line-height:1.65;color:#e2e8f0;max-width:72ch;">
+        <div style="font-size:0.86rem;line-height:1.6;color:#334155;max-width:72ch;">
             {formatted_body}
         </div>
     </div>
@@ -639,30 +882,27 @@ def render_insight_section_card(title: str, body: str, icon_name: str, accent_co
 
 
 def render_direct_answer_card(question: str, answer: str) -> str:
-    """Renders a foreground spotlight glass card with the direct RAG answer to the user's question."""
-    sparkles_svg = get_svg_icon("sparkles", size=24, color="#38bdf8")
+    """Renders a spotlight card with the direct RAG answer to the user's question."""
+    sparkles_svg = get_svg_icon("sparkles", size=20, color="#2563eb")
     safe_q = html.escape(question.strip())
     formatted_ans = highlight_domain_terms(answer.strip())
     return _compact_html(f"""
-    <div class="glass-layer-3" style="margin:12px 0 20px 0;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.14);">
-            <div style="display:flex;align-items:center;gap:12px;">
-                <div style="width:40px;height:40px;border-radius:10px;background:rgba(56,189,248,0.16);border:1px solid rgba(56,189,248,0.38);display:flex;align-items:center;justify-content:center;">
-                    {sparkles_svg}
+    <div style="background:linear-gradient(135deg,#eff6ff 0%,#f8fafc 100%);border:1px solid #bfdbfe;border-radius:14px;padding:16px 20px;margin:8px 0 16px 0;box-shadow:0 4px 14px rgba(37,99,235,0.06);">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <div style="width:34px;height:34px;border-radius:9px;background:#ffffff;border:1px solid #bfdbfe;display:flex;align-items:center;justify-content:center;">
+                {sparkles_svg}
+            </div>
+            <div>
+                <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.05em;color:#2563eb;font-weight:800;">
+                    Bezpośrednia odpowiedź asystenta RAG
                 </div>
-                <div>
-                    <div style="font-size:0.76rem;text-transform:uppercase;letter-spacing:0.06em;color:#7dd3fc;font-weight:700;">
-                        Bezpośrednia odpowiedź asystenta RAG
-                    </div>
-                    <div style="font-size:1rem;font-weight:700;color:#ffffff;margin-top:2px;">
-                        Pytanie: {safe_q}
-                    </div>
+                <div style="font-size:0.9rem;font-weight:700;color:#0f172a;">
+                    Pytanie: {safe_q}
                 </div>
             </div>
         </div>
-        <div style="font-size:0.98rem;line-height:1.65;color:#f8fafc;max-width:85ch;">
+        <div style="font-size:0.9rem;line-height:1.6;color:#1e293b;padding-left:44px;">
             {formatted_ans}
         </div>
     </div>
     """)
-

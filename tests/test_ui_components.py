@@ -5,13 +5,18 @@ from src.ui.components import (
     get_glassmorphism_stylesheet,
     get_svg_icon,
     highlight_domain_terms,
+    render_brand_sidebar_header,
     render_citation_box,
     render_competitor_matrix,
     render_direct_answer_card,
     render_insight_section_card,
     render_kio_warning,
+    render_kpi_stat_card,
+    render_procurements_table,
     render_red_flag_badge,
+    render_risk_profile_panel,
     render_tender_card,
+    render_top_utility_bar,
 )
 
 
@@ -115,4 +120,50 @@ def test_rag_question_templates_and_direct_answer():
     )
     assert "Bezpośrednia odpowiedź asystenta RAG" in card_html
     assert "2%" in card_html
+
+
+def test_dashboard_layout_components():
+    sidebar_hdr = render_brand_sidebar_header()
+    assert "GisMarket" in sidebar_hdr
+    assert "Intelligence AI" in sidebar_hdr
+
+    top_bar = render_top_utility_bar(
+        municipality="Gmina Niepołomice",
+        voivodeship="Małopolskie",
+        ollama_ok=True,
+        total_tenders=4,
+        has_lockin=True,
+    )
+    assert "Gmina Niepołomice" in top_bar
+    assert "4 SWZ" in top_bar
+
+    kpi = render_kpi_stat_card(
+        value="320 tys. PLN",
+        label="Szacowany budżet",
+        sublabel="Gmina Niepołomice",
+        icon_name="wallet",
+        color_hex="#3b82f6",
+        ring_bg="rgba(59, 130, 246, 0.14)",
+    )
+    assert "320 tys. PLN" in kpi
+
+    risk_panel = render_risk_profile_panel(has_lockin=True, has_penalties=True, faithfulness=1.0)
+    assert "Profil ryzyka SWZ" in risk_panel
+    assert "v-bar-fill" in risk_panel
+
+    table_html = render_procurements_table(
+        rows=[
+            {
+                "ID": "ocds-148610-niepolomice",
+                "Zamawiający": "Gmina Niepołomice",
+                "Tytuł": "Modernizacja BDOT500",
+                "Województwo": "Małopolskie",
+                "Budżet PLN": 320000.0,
+            }
+        ],
+        selected_id="ocds-148610-niepolomice",
+    )
+    assert "Postępowania przetargowe w bazie" in table_html
+    assert "W analizie" in table_html
+
 
