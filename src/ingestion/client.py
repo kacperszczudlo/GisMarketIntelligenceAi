@@ -16,8 +16,25 @@ from src.ingestion.rate_limiter import LeakyBucketRateLimiter
 logger = logging.getLogger(__name__)
 
 NUTS_PROVINCE_MAP: Dict[str, str] = {
+    # TERYT / BZP province codes (PL + 2-digit GUS TERYT)
+    "PL02": "Dolnośląskie",
+    "PL04": "Kujawsko-Pomorskie",
+    "PL06": "Lubelskie",
+    "PL08": "Lubuskie",
+    "PL10": "Łódzkie",
+    "PL12": "Małopolskie",
+    "PL14": "Mazowieckie",
+    "PL16": "Opolskie",
+    "PL18": "Podkarpackie",
+    "PL20": "Podlaskie",
+    "PL22": "Pomorskie",
+    "PL24": "Śląskie",
+    "PL26": "Świętokrzyskie",
+    "PL28": "Warmińsko-Mazurskie",
+    "PL30": "Wielkopolskie",
+    "PL32": "Zachodniopomorskie",
+    # NUTS-2 fallback codes
     "PL21": "Małopolskie",
-    "PL22": "Śląskie",
     "PL41": "Wielkopolskie",
     "PL42": "Zachodniopomorskie",
     "PL43": "Lubuskie",
@@ -33,7 +50,6 @@ NUTS_PROVINCE_MAP: Dict[str, str] = {
     "PL84": "Podlaskie",
     "PL91": "Mazowieckie",
     "PL92": "Mazowieckie",
-    "PL12": "Mazowieckie",
 }
 
 

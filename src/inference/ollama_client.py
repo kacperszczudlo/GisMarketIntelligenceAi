@@ -13,7 +13,7 @@ class OllamaClient:
         self,
         base_url: Optional[str] = None,
         model: Optional[str] = None,
-        timeout: float = 300.0,
+        timeout: float = 15.0,
     ) -> None:
         self.base_url = (base_url or settings.OLLAMA_BASE_URL).rstrip("/")
         self.model = model or settings.OLLAMA_MODEL
@@ -22,7 +22,7 @@ class OllamaClient:
     async def check_health(self) -> bool:
         """Verifies if the Ollama daemon is reachable and responding."""
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(timeout=3.0) as client:
                 res = await client.get(f"{self.base_url}/api/tags")
                 return res.status_code == 200
         except Exception as e:
@@ -32,7 +32,7 @@ class OllamaClient:
     async def _resolve_available_model(self, client: httpx.AsyncClient) -> Optional[str]:
         """Queries /api/tags and returns the first installed Ollama model if configured model is absent."""
         try:
-            res = await client.get(f"{self.base_url}/api/tags", timeout=5.0)
+            res = await client.get(f"{self.base_url}/api/tags", timeout=3.0)
             if res.status_code == 200:
                 models = res.json().get("models", [])
                 if models:
@@ -63,7 +63,8 @@ class OllamaClient:
             "options": {
                 "temperature": temperature,
                 "top_p": 0.9,
-                "num_ctx": 8192,
+                "num_ctx": 2048,
+                "num_predict": 350,
             },
         }
         if system:
@@ -94,7 +95,8 @@ class OllamaClient:
             "options": {
                 "temperature": temperature,
                 "top_p": 0.9,
-                "num_ctx": 8192,
+                "num_ctx": 2048,
+                "num_predict": 350,
             },
         }
 
