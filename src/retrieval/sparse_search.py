@@ -12,47 +12,68 @@ class SparseRetriever:
     @staticmethod
     def _prepare_tsquery_terms(query: str) -> str:
         """Sanitizes raw natural query into an OR/AND joined tsquery expression."""
-        # Extract alphanumeric words and special terms (e.g. .str, bdot500, kio)
         cleaned = re.sub(r"[^\w\s\.]", " ", query, flags=re.UNICODE)
         words = [w.strip(" .") for w in cleaned.split() if len(w.strip(" .")) >= 2]
         if not words:
             return ""
-        # Join words with '|' (OR) for broad lexical recall
         return " | ".join(words)
 
-    def search(
+    def _execute_query(
         self,
-        query: str,
-        top_k: int = 50,
+        tsquery_str: str,
+        top_k: int,
         parent_id: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
-        """Finds top_k matching chunks using full-text search and ts_rank_cd."""
-        tsquery_str = self._prepare_tsquery_terms(query)
-        if not tsquery_str:
-            return []
-
+        procurement_id: Optional[str] = None,
+    ) -> List[Any]:
         sql = """
             SELECT cv.id, cv.parent_id, cv.chunk_index, cv.content, cv.metadata_payload,
                    ts_rank_cd(cv.content_tsvector, to_tsquery('simple', %s)) AS rank
             FROM chunk_vectors cv
-            WHERE cv.content_tsvector @@ to_tsquery('simple', %s)
         """
-        params: List[Any] = [tsquery_str, tsquery_str]
+        params: List[Any] = [tsquery_str]
+        conditions: List[str] = ["cv.content_tsvector @@ to_tsquery('simple', %s)"]
+        params.append(tsquery_str)
+
+        if procurement_id and procurement_id.lower() != "sample":
+            sql += """
+                JOIN parent_nodes pn ON cv.parent_id = pn.id
+                JOIN attachments a ON pn.attachment_id = a.id
+                JOIN procurements p ON a.procurement_id = p.id
+            """
+            conditions.append("(p.ocds_id = %s OR p.id::text = %s)")
+            params.extend([procurement_id, procurement_id])
 
         if parent_id:
-            sql += " AND cv.parent_id = %s"
+            conditions.append("cv.parent_id = %s")
             params.append(parent_id)
 
+        sql += " WHERE " + " AND ".join(conditions)
         sql += " ORDER BY rank DESC LIMIT %s;"
         params.append(top_k)
 
         with db_manager.get_cursor() as cur:
             try:
                 cur.execute(sql, tuple(params))
-                rows = cur.fetchall()
+                return cur.fetchall()
             except Exception as e:
-                logger.warning("Sparse search query failed for query '%s': %s", query, e)
+                logger.warning("Sparse search query failed: %s", e)
                 return []
+
+    def search(
+        self,
+        query: str,
+        top_k: int = 50,
+        parent_id: Optional[str] = None,
+        procurement_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Finds top_k matching chunks using full-text search and ts_rank_cd."""
+        tsquery_str = self._prepare_tsquery_terms(query)
+        if not tsquery_str:
+            return []
+
+        rows = self._execute_query(tsquery_str, top_k=top_k, parent_id=parent_id, procurement_id=procurement_id)
+        if not rows and procurement_id and procurement_id.lower() != "sample":
+            rows = self._execute_query(tsquery_str, top_k=top_k, parent_id=parent_id, procurement_id=None)
 
         results: List[Dict[str, Any]] = []
         for r in rows:

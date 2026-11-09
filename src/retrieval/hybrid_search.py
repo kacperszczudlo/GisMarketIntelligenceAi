@@ -25,10 +25,15 @@ class HybridSearchEngine:
         query: str,
         top_k: int = 50,
         parent_id: Optional[str] = None,
+        procurement_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Executes parallel dense and sparse searches, fusing candidates via RRF."""
-        dense_candidates = self.dense.search(query, top_k=top_k, parent_id=parent_id)
-        sparse_candidates = self.sparse.search(query, top_k=top_k, parent_id=parent_id)
+        kwargs: Dict[str, Any] = {"top_k": top_k, "parent_id": parent_id}
+        if procurement_id is not None:
+            kwargs["procurement_id"] = procurement_id
+
+        dense_candidates = self.dense.search(query, **kwargs)
+        sparse_candidates = self.sparse.search(query, **kwargs)
 
         fused = reciprocal_rank_fusion([dense_candidates, sparse_candidates], k=self.k)
         return fused[:top_k]

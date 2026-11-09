@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = Field(default="postgres_secret")
 
     OLLAMA_BASE_URL: str = Field(default="http://localhost:11434")
+    OLLAMA_MODEL: str = Field(default="gis-analyst")
     EMBEDDING_MODEL_NAME: str = Field(default="BAAI/bge-m3")
     RERANKER_MODEL_NAME: str = Field(default="BAAI/bge-reranker-v2-m3")
 

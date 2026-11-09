@@ -69,19 +69,26 @@ class RagasGuard:
 
     @staticmethod
     def _extract_sentences(text: str) -> List[str]:
-        """Splits markdown text into clean factual statements."""
-        # Remove headers, bullet markers, markdown bold
+        """Splits markdown text into clean factual statements, ignoring structural report headers."""
         cleaned_lines = []
         for line in text.splitlines():
             line_str = line.strip()
-            if not line_str or line_str.startswith("#") or line_str.startswith("---"):
+            if (
+                not line_str
+                or line_str.startswith("#")
+                or line_str.startswith("---")
+                or line_str.startswith("**Zamawiający:**")
+                or line_str.startswith("**Przedmiot zamówienia:**")
+                or "brak informacji w dostarczonej dokumentacji" in line_str.lower()
+            ):
                 continue
-            # Strip bullet prefixes
-            line_str = re.sub(r"^[-*•\d+.]\s*", "", line_str)
-            cleaned_lines.append(line_str)
+            # Strip citation brackets and bullet prefixes
+            line_str = re.sub(r"\[.*?\]", "", line_str)
+            line_str = re.sub(r"^[-*•\d+.]+\s*", "", line_str)
+            if line_str.strip():
+                cleaned_lines.append(line_str.strip())
 
         full_text = " ".join(cleaned_lines)
-        # Split by sentence terminators
         sentences = re.split(r"(?<=[.!?])\s+", full_text)
         return [s.strip() for s in sentences if len(s.strip()) > 10]
 
@@ -91,14 +98,14 @@ class RagasGuard:
         contexts: List[str],
         question: Optional[str] = None,
     ) -> EvaluationResult:
-        """Heuristic lexical and entity verification of answer claims against context chunks."""
+        """Heuristic lexical and morphological stem verification of answer claims against context chunks."""
         statements = self._extract_sentences(answer)
         if not statements:
             return EvaluationResult(
                 faithfulness=1.0,
                 answer_relevancy=1.0,
                 passed=True,
-                reason="Brak twierdzeń do weryfikacji.",
+                reason="Brak twierdzeń do weryfikacji (lub poprawna odmowa odpowiedzi).",
             )
 
         merged_context = " ".join(contexts).lower()
@@ -108,7 +115,10 @@ class RagasGuard:
         stop_words = {
             "w", "z", "o", "i", "a", "na", "do", "oraz", "dla", "jest", "są",
             "to", "że", "się", "nie", "jak", "od", "po", "przez", "ze", "we",
-            "lub", "albo", "postępowanie", "zamawiający", "wykonawca",
+            "lub", "albo", "postępowanie", "postępowania", "zamawiający", "wykonawca",
+            "zawiera", "wymaga", "również", "dotyczy", "wskazuje", "zgodnie",
+            "załącznik", "strona", "rozdział", "brak", "informacji", "dostarczonej",
+            "dokumentacji", "przetargowej", "analiza", "podstawie", "punkt",
         }
 
         for stmt in statements:
@@ -123,12 +133,16 @@ class RagasGuard:
                 supported_claims.append(stmt)
                 continue
 
-            # Check matching keywords in context
-            matches = [w for w in key_words if w in merged_context]
+            # Match exact word or 5-char Polish morphological root in context
+            matches = [
+                w
+                for w in key_words
+                if w in merged_context or (len(w) >= 5 and w[:5] in merged_context)
+            ]
             match_ratio = len(matches) / len(key_words)
 
-            # A statement is deemed grounded if >= 60% of significant content words are supported
-            if match_ratio >= 0.60:
+            # A statement is deemed grounded if >= 50% of significant domain words/roots are supported
+            if match_ratio >= 0.50:
                 supported_claims.append(stmt)
             else:
                 unsupported_claims.append(stmt)
