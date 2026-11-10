@@ -1,5 +1,5 @@
-import pytest
 from src.inference.prompts import (
+    STRICT_GROUNDING_SYSTEM_PROMPT,
     build_competitor_matrix_prompt,
     build_grounded_prompt,
     build_historical_risk_prompt,
@@ -8,45 +8,85 @@ from src.inference.prompts import (
 )
 
 
-def test_build_grounded_prompt_contains_strict_directives():
+def test_should_include_strict_grounding_rules_in_system_prompt() -> None:
+    # Arrange & Act
+    system_prompt = STRICT_GROUNDING_SYSTEM_PROMPT
+
+    # Assert
+    assert "Odpowiadaj wyłącznie na podstawie" in system_prompt
+    assert "[Załącznik, Strona, Rozdział]" in system_prompt
+    assert "Brak informacji w dostarczonej dokumentacji przetargowej." in system_prompt
+
+
+def test_should_build_grounded_prompt_with_context_and_refusal_directive() -> None:
+    # Arrange
     context = "Kierownik projektu: min. 3 lata doświadczenia."
     query = "Jakie doświadczenie musi mieć kierownik?"
-    prompt = build_grounded_prompt(query, context)
 
+    # Act
+    prompt = build_grounded_prompt(query=query, context=context)
+
+    # Assert
     assert "Odpowiadaj wyłącznie na podstawie" in prompt
-    assert "Brak informacji w dostarczonej dokumentacji przetargowej" in prompt
-    assert "Kierownik projektu: min. 3 lata doświadczenia." in prompt
-    assert "Jakie doświadczenie musi mieć kierownik?" in prompt
+    assert "Brak informacji w dostarczonej dokumentacji przetargowej." in prompt
+    assert context in prompt
+    assert query in prompt
 
 
-def test_vendor_lockin_prompt_contains_rules():
-    p = build_vendor_lockin_prompt(
-        context="Wymóg przekazania bazy w plikach .str do programu EWMAPA.",
-        municipality="Gmina Niepołomice",
-    )
-    assert "Gmina Niepołomice" in p
-    assert "Vendor Lock-in" in p or "barier" in p or "konkurencji" in p
-    assert ".str" in p
-    assert "EWMAPA" in p
-    assert "numer strony" in p or "źródło" in p
+def test_should_build_vendor_lockin_prompt_targeting_proprietary_formats() -> None:
+    # Arrange
+    context = "Wymóg przekazania bazy w plikach .str do programu EWMAPA."
+    municipality = "Gmina Niepołomice"
+
+    # Act
+    prompt = build_vendor_lockin_prompt(context=context, municipality=municipality)
+
+    # Assert
+    assert municipality in prompt
+    assert "Vendor Lock-in" in prompt
+    assert ".str" in prompt
+    assert "EWMAPA" in prompt
+    assert "GML" in prompt
 
 
-def test_kio_appeal_prompt():
-    p = build_kio_appeal_prompt(context="Zapis o plikach wsadowych .str.")
-    assert "KIO" in p
-    assert "art. 16" in p
-    assert "art. 99 ust. 4" in p
-    assert "GML" in p
+def test_should_build_kio_appeal_prompt_with_default_and_custom_precedents() -> None:
+    # Arrange
+    context = "Zapis o plikach wsadowych .str."
+    custom_precedent = "Wyrok KIO 999/25 dotyczący interoperacyjności GML."
+
+    # Act
+    default_prompt = build_kio_appeal_prompt(context=context)
+    custom_prompt = build_kio_appeal_prompt(context=context, kio_precedents=custom_precedent)
+
+    # Assert
+    assert "art. 16" in default_prompt
+    assert "art. 99 ust. 4" in default_prompt
+    assert "KIO 1592/24" in default_prompt
+    assert custom_precedent in custom_prompt
 
 
-def test_competitor_matrix_prompt():
-    p = build_competitor_matrix_prompt(context="Punktacja za moduł ankiet przestrzennych.")
-    assert "Geo-System" in p
-    assert "GIAP" in p
-    assert "kryteria oceny" in p or "kryteriów" in p
+def test_should_build_competitor_matrix_prompt_with_market_profiles() -> None:
+    # Arrange
+    context = "Punktacja za moduł ankiet przestrzennych."
+
+    # Act
+    prompt = build_competitor_matrix_prompt(context=context)
+
+    # Assert
+    assert "Geo-System" in prompt
+    assert "GIAP" in prompt
+    assert context in prompt
 
 
-def test_historical_risk_prompt():
-    p = build_historical_risk_prompt(context="Stawka 250 PLN/ha, termin 6 miesięcy.", voivodeship="Małopolskie")
-    assert "Małopolskie" in p
-    assert "budżet" in p or "stawek" in p or "termin" in p
+def test_should_build_historical_risk_prompt_with_voivodeship_benchmark() -> None:
+    # Arrange
+    context = "Stawka 250 PLN/ha, termin 6 miesięcy."
+    voivodeship = "Małopolskie"
+
+    # Act
+    prompt = build_historical_risk_prompt(context=context, voivodeship=voivodeship)
+
+    # Assert
+    assert voivodeship in prompt
+    assert "350 PLN/ha" in prompt
+    assert context in prompt
