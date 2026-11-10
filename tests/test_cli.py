@@ -1,5 +1,5 @@
 import pytest
-from src.cli import create_cli_parser
+from src.cli import create_cli_parser, ensure_sample_swz_pdf
 
 
 def test_cli_parser_arguments():
@@ -55,7 +55,7 @@ def test_main_help_exits():
 
 def test_main_missing_required_analyze_argument():
     from src.cli import main
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as exc_info:
         main(["analyze"])
 
 
@@ -68,3 +68,11 @@ def test_main_parse_empty_dir(tmp_path):
     exit_code = main(["parse", "--input-dir", str(input_dir), "--output-dir", str(output_dir)])
     assert exit_code == 0
 
+
+def test_ensure_sample_swz_pdf_generates_valid_pdf(tmp_path):
+    pdf_path = ensure_sample_swz_pdf(tmp_path)
+    assert pdf_path.exists()
+    raw_bytes = pdf_path.read_bytes()
+    assert raw_bytes.startswith(b"%PDF-1.4")
+    assert b"EWMAPA" in raw_bytes
+    assert b".str" in raw_bytes

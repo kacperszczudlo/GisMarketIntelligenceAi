@@ -1,6 +1,5 @@
-import pytest
-import httpx
 from unittest.mock import AsyncMock, patch
+import pytest
 from src.ingestion.client import EZamowieniaClient
 from src.ingestion.models import TenderNotice
 
@@ -30,12 +29,14 @@ async def test_ezamowienia_client_fetch_notices_mocked():
         assert isinstance(notices[0], TenderNotice)
         assert notices[0].ocds_id == "ocds-148610-99999"
         assert notices[0].municipality_name == "Gmina Kórnik"
+        mock_req.assert_awaited_once()
+        endpoint_called = mock_req.call_args[0][0]
+        assert endpoint_called == "notice"
 
 
 @pytest.mark.asyncio
 async def test_ezamowienia_client_parses_bzp_feed():
     client = EZamowieniaClient()
-    # Test normalization of public feed format into TenderNotice
     raw_notice = {
         "objectId": "ocds-148610-bzp-1",
         "orderObject": "Modernizacja ewidencji gruntów i budynków EGiB",
@@ -50,3 +51,24 @@ async def test_ezamowienia_client_parses_bzp_feed():
     assert normalized.ocds_id == "ocds-148610-bzp-1"
     assert "71354300-7" in normalized.cpv_codes
     assert normalized.voivodeship == "Mazowieckie"
+
+
+def test_ezamowienia_client_normalizes_live_bzp_format():
+    client = EZamowieniaClient()
+    live_sample = {
+        "tenderId": "ocds-148610-77b4a0d6-0f31-4cce-871f-af8d5995d733",
+        "objectId": "08dd2b37-14f9-4a1c-aa0d-d80001d3bd86",
+        "orderObject": "Modernizacja bazy BDOT500 i GESUT",
+        "organizationName": "Gmina Niepołomice",
+        "organizationProvince": "PL21",
+        "cpvCode": "71250000-5 (Usługi architektoniczne),71354300-7 (Usługi badań katastralnych)",
+        "publicationDate": "2025-01-02T14:09:33.1150927Z",
+        "submittingOffersDate": "2025-01-13T09:00:00Z",
+        "htmlBody": "<html><body><h1>Ogłoszenie SWZ</h1><p>Wymagany eksport do formatu .str programu EWMAPA.</p></body></html>",
+    }
+    normalized = client.normalize_notice(live_sample)
+    assert normalized.ocds_id == "ocds-148610-77b4a0d6-0f31-4cce-871f-af8d5995d733"
+    assert normalized.voivodeship == "Małopolskie"
+    assert normalized.cpv_codes == ["71250000-5", "71354300-7"]
+    assert len(normalized.attachments) == 1
+    assert "EWMAPA" in (normalized.attachments[0].raw_markdown or "")

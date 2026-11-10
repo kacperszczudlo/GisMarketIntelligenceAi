@@ -24,22 +24,27 @@ class RetrievalPipeline:
     def retrieve(
         self,
         query: str,
-        top_candidates: int = 50,
+        top_candidates: int = 8,
         top_k: int = 3,
         parent_id: Optional[str] = None,
+        procurement_id: Optional[str] = None,
         reorder_context: bool = True,
     ) -> List[Dict[str, Any]]:
         """Executes the full two-stage retrieval pipeline.
 
-        1. Hybrid Search (Dense + Sparse fused via RRF) retrieves top_candidates (default 50).
+        1. Hybrid Search (Dense + Sparse fused via RRF) retrieves top_candidates.
         2. Cross-Encoder reranks top_candidates to top_k most accurate child chunks.
         3. Resolves child chunks to full ParentNode sections from database.
         4. Reorders parent nodes in U-shape to counter Lost-In-The-Middle effect.
         """
         logger.info("Executing retrieval for query: '%s' (top_k=%d)", query, top_k)
 
+        search_kwargs: Dict[str, Any] = {"top_k": top_candidates, "parent_id": parent_id}
+        if procurement_id is not None:
+            search_kwargs["procurement_id"] = procurement_id
+
         # Stage 1: Hybrid Search
-        candidates = self.hybrid.search(query, top_k=top_candidates, parent_id=parent_id)
+        candidates = self.hybrid.search(query, **search_kwargs)
         if not candidates:
             return []
 

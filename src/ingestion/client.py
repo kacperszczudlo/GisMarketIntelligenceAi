@@ -1,15 +1,56 @@
 import asyncio
 from datetime import datetime, timezone
+import hashlib
 import logging
 import random
+import re
 from typing import Any, Dict, List, Optional
+from uuid import UUID
+from bs4 import BeautifulSoup
 import httpx
 
 from src.database.connection import db_manager
-from src.ingestion.models import TenderNotice
+from src.ingestion.models import AttachmentMetadata, TenderNotice
 from src.ingestion.rate_limiter import LeakyBucketRateLimiter
 
 logger = logging.getLogger(__name__)
+
+NUTS_PROVINCE_MAP: Dict[str, str] = {
+    # TERYT / BZP province codes (PL + 2-digit GUS TERYT)
+    "PL02": "Dolnośląskie",
+    "PL04": "Kujawsko-Pomorskie",
+    "PL06": "Lubelskie",
+    "PL08": "Lubuskie",
+    "PL10": "Łódzkie",
+    "PL12": "Małopolskie",
+    "PL14": "Mazowieckie",
+    "PL16": "Opolskie",
+    "PL18": "Podkarpackie",
+    "PL20": "Podlaskie",
+    "PL22": "Pomorskie",
+    "PL24": "Śląskie",
+    "PL26": "Świętokrzyskie",
+    "PL28": "Warmińsko-Mazurskie",
+    "PL30": "Wielkopolskie",
+    "PL32": "Zachodniopomorskie",
+    # NUTS-2 fallback codes
+    "PL21": "Małopolskie",
+    "PL41": "Wielkopolskie",
+    "PL42": "Zachodniopomorskie",
+    "PL43": "Lubuskie",
+    "PL51": "Dolnośląskie",
+    "PL52": "Opolskie",
+    "PL61": "Kujawsko-Pomorskie",
+    "PL62": "Warmińsko-Mazurskie",
+    "PL63": "Pomorskie",
+    "PL71": "Łódzkie",
+    "PL72": "Świętokrzyskie",
+    "PL81": "Lubelskie",
+    "PL82": "Podkarpackie",
+    "PL84": "Podlaskie",
+    "PL91": "Mazowieckie",
+    "PL92": "Mazowieckie",
+}
 
 
 class EZamowieniaClient:
@@ -68,9 +109,25 @@ class EZamowieniaClient:
 
         raise RuntimeError(f"Failed to fetch data from {url}")
 
+    @staticmethod
+    def _extract_html_to_markdown(html_body: str, title: str, ocds_id: str) -> str:
+        """Converts BZP notice HTML body into structured Markdown."""
+        soup = BeautifulSoup(html_body, "html.parser")
+        for tag in soup(["style", "script"]):
+            tag.decompose()
+        lines = [line.strip() for line in soup.get_text(separator="\n").splitlines() if line.strip()]
+        body_text = "\n".join(lines)
+        return f"# Ogłoszenie BZP: {title}\n**ID Postępowania:** {ocds_id}\n\n## Treść ogłoszenia\n\n{body_text}\n"
+
     def normalize_notice(self, raw: Dict[str, Any]) -> TenderNotice:
         """Normalizes API JSON dictionary into a strongly typed TenderNotice model."""
-        ocds_id = raw.get("ocds_id") or raw.get("objectId") or raw.get("noticeNumber") or "UNKNOWN_OCDS"
+        ocds_id = (
+            raw.get("ocds_id")
+            or raw.get("tenderId")
+            or raw.get("objectId")
+            or raw.get("noticeNumber")
+            or "UNKNOWN_OCDS"
+        )
         title = raw.get("title") or raw.get("orderObject") or "Brak tytułu postępowania"
         municipality = (
             raw.get("municipality_name")
@@ -78,18 +135,25 @@ class EZamowieniaClient:
             or raw.get("organizationName")
             or "Nieokreślony Zamawiający"
         )
-        voivodeship = (
+        raw_prov = str(
             raw.get("voivodeship")
             or raw.get("purchaserProvince")
+            or raw.get("organizationProvince")
             or raw.get("province")
             or "Polska"
-        )
+        ).strip()
+        voivodeship = NUTS_PROVINCE_MAP.get(raw_prov.upper(), raw_prov)
+
         budget = raw.get("estimated_budget_pln") or raw.get("tenderValue")
 
         # Normalize CPV codes
         raw_cpv = raw.get("cpv_codes") or raw.get("cpvCode") or []
         if isinstance(raw_cpv, str):
-            cpv_codes = [c.strip() for c in raw_cpv.split(",") if c.strip()]
+            extracted_codes = re.findall(r"\b\d{8}-\d\b", raw_cpv)
+            if extracted_codes:
+                cpv_codes = list(dict.fromkeys(extracted_codes))
+            else:
+                cpv_codes = [c.strip() for c in raw_cpv.split(",") if c.strip()]
         elif isinstance(raw_cpv, list):
             cpv_codes = [str(c).strip() for c in raw_cpv if str(c).strip()]
         else:
@@ -98,16 +162,34 @@ class EZamowieniaClient:
         # Parse publication date
         pub_raw = raw.get("date_published") or raw.get("publicationDate") or datetime.now(timezone.utc).isoformat()
         if isinstance(pub_raw, str):
-            date_published = datetime.fromisoformat(pub_raw.replace("Z", "+00:00"))
+            # Truncate nanoseconds if >6 fractional digits for Python <3.11 compatibility or clean ISO parsing
+            pub_clean = re.sub(r"\.(\d{6})\d+", r".\1", pub_raw.replace("Z", "+00:00"))
+            date_published = datetime.fromisoformat(pub_clean)
         else:
             date_published = pub_raw
 
         # Parse deadline date
         dead_raw = raw.get("date_deadline") or raw.get("submittingOffersDate") or datetime.now(timezone.utc).isoformat()
         if isinstance(dead_raw, str):
-            date_deadline = datetime.fromisoformat(dead_raw.replace("Z", "+00:00"))
+            dead_clean = re.sub(r"\.(\d{6})\d+", r".\1", dead_raw.replace("Z", "+00:00"))
+            date_deadline = datetime.fromisoformat(dead_clean)
         else:
             date_deadline = dead_raw
+
+        attachments: List[AttachmentMetadata] = []
+        html_body = raw.get("htmlBody")
+        if html_body and isinstance(html_body, str) and len(html_body.strip()) > 20:
+            md_text = self._extract_html_to_markdown(html_body, title=title, ocds_id=ocds_id)
+            digest = hashlib.sha256(md_text.encode("utf-8")).hexdigest()
+            safe_id = re.sub(r"[^\w\-]", "_", ocds_id)[:60]
+            attachments.append(
+                AttachmentMetadata(
+                    file_name=f"BZP_{safe_id}.md",
+                    file_type="BZP_NOTICE",
+                    sha256_hash=digest,
+                    raw_markdown=md_text,
+                )
+            )
 
         return TenderNotice(
             ocds_id=ocds_id,
@@ -119,19 +201,28 @@ class EZamowieniaClient:
             date_published=date_published,
             date_deadline=date_deadline,
             status=raw.get("status", "ACTIVE"),
+            attachments=attachments,
         )
 
     async def fetch_notices(
-        self, cpv_codes: List[str], limit: int = 10, date_from: Optional[str] = None
+        self,
+        cpv_codes: List[str],
+        limit: int = 10,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        notice_type: str = "ContractNotice",
     ) -> List[TenderNotice]:
-        """Fetches notices filtered by geodetic/GIS CPV codes."""
-        params: Dict[str, Any] = {"pageSize": limit}
+        """Fetches notices filtered by geodetic/GIS CPV codes from official BZP API."""
+        params: Dict[str, Any] = {
+            "NoticeType": notice_type,
+            "PublicationDateFrom": date_from or "2025-01-01T00:00:00",
+            "PublicationDateTo": date_to or datetime.now(timezone.utc).strftime("%Y-%m-%dT23:59:59"),
+            "PageSize": limit,
+        }
         if cpv_codes:
-            params["cpvCode"] = ",".join(cpv_codes)
-        if date_from:
-            params["dateFrom"] = date_from
+            params["CpvCode"] = ",".join(cpv_codes)
 
-        raw_items = await self._request_api("Notice/search", params=params)
+        raw_items = await self._request_api("notice", params=params)
         if isinstance(raw_items, dict) and "items" in raw_items:
             items = raw_items["items"]
         elif isinstance(raw_items, list):
@@ -141,8 +232,8 @@ class EZamowieniaClient:
 
         return [self.normalize_notice(item) for item in items[:limit]]
 
-    def save_notice_to_db(self, notice: TenderNotice) -> None:
-        """Upserts a tender notice into the PostgreSQL procurements table."""
+    def save_notice_to_db(self, notice: TenderNotice) -> UUID:
+        """Upserts a tender notice and its inline BZP attachments into PostgreSQL."""
         with db_manager.get_cursor(commit=True) as cur:
             cur.execute(
                 """
@@ -154,10 +245,11 @@ class EZamowieniaClient:
                     title = EXCLUDED.title,
                     municipality_name = EXCLUDED.municipality_name,
                     voivodeship = EXCLUDED.voivodeship,
-                    estimated_budget_pln = EXCLUDED.estimated_budget_pln,
+                    estimated_budget_pln = COALESCE(EXCLUDED.estimated_budget_pln, procurements.estimated_budget_pln),
                     cpv_codes = EXCLUDED.cpv_codes,
                     date_deadline = EXCLUDED.date_deadline,
-                    status = EXCLUDED.status;
+                    status = EXCLUDED.status
+                RETURNING id;
                 """,
                 (
                     str(notice.id),
@@ -172,3 +264,29 @@ class EZamowieniaClient:
                     notice.status,
                 ),
             )
+            row = cur.fetchone()
+            db_proc_id = UUID(str(row[0])) if row else notice.id
+
+            for att in notice.attachments:
+                if att.raw_markdown and att.sha256_hash:
+                    cur.execute(
+                        "SELECT id FROM attachments WHERE procurement_id = %s AND sha256_hash = %s;",
+                        (str(db_proc_id), att.sha256_hash),
+                    )
+                    if not cur.fetchone():
+                        cur.execute(
+                            """
+                            INSERT INTO attachments (id, procurement_id, file_name, file_type, sha256_hash, raw_markdown)
+                            VALUES (%s, %s, %s, %s, %s, %s);
+                            """,
+                            (
+                                str(att.id),
+                                str(db_proc_id),
+                                att.file_name,
+                                att.file_type,
+                                att.sha256_hash,
+                                att.raw_markdown,
+                            ),
+                        )
+
+        return db_proc_id
