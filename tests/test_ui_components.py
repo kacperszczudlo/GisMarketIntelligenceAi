@@ -242,3 +242,24 @@ def test_should_not_flag_high_str_risk_without_str_extension() -> None:
     )
     assert metrics["kio_level"] != "HIGH"
     assert metrics["has_lockin"] is False
+
+
+def test_should_render_clickable_procurements_table_without_checkboxes() -> None:
+    from src.ui.components import render_clickable_procurements_table
+
+    html_out = render_clickable_procurements_table(
+        rows=[
+            {
+                "ID": "ocds-148610-niepolomice",
+                "Zamawiający": "Gmina Niepołomice",
+                "Tytuł": "Modernizacja BDOT500",
+                "Województwo": "Małopolskie",
+                "Budżet PLN": 320000.0,
+                "Termin": "2026-11-20",
+            }
+        ],
+        session_token="tok123",
+    )
+    assert "tender-row" in html_out
+    assert "?session=tok123&tender=ocds-148610-niepolomice" in html_out
+    assert 'type="checkbox"' not in html_out
