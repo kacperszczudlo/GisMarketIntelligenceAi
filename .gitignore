@@ -206,3 +206,7 @@ huggingface_cache/
 docs/plans/
 plan/
 *implementation-plan.md
+
+# Frontend dependencies and build artifacts
+node_modules/
+frontend/dist/
