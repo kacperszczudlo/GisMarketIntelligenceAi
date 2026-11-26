@@ -52,11 +52,12 @@ graph TD
         QP6[Rozwiązanie węzła nadrzędnego Parent]
     end
 
-    subgraph InferenceAndEval [Wnioskowanie i ewaluacja]
-        IE1[Ollama: Llama-3.1-8B-Instruct Q4_K_M]
+    subgraph InferenceAndEval [Wnioskowanie, API i interfejs webowy]
+        IE1[Ollama: gis-analyst + Structured JSON]
         IE2[Szablon promptu z rygorystycznym uziemieniem]
-        IE3[Moduł ewaluacji RAGAS]
-        IE4[Interfejs użytkownika]
+        IE3[Moduł ewaluacji RAGAS >= 0.95]
+        IE4[FastAPI REST + SSE Streaming + Argon2id Auth]
+        IE5[React 18 + Vite SPA + Eksport PDF]
     end
 
     DataSources --> IngestionParsing
