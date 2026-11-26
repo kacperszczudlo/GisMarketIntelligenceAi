@@ -218,3 +218,11 @@ def test_should_instantiate_red_flag_and_competitor_models() -> None:
     # Assert
     assert flag.severity == "WYSOKIE"
     assert comp.name == "Geo-System Sp. z o.o."
+
+
+def test_should_return_no_info_message_for_unrelated_question(sample_swz_markdown: str) -> None:
+    answer = TenderReportGenerator.answer_specific_question(
+        "Jaka jest dzisiaj pogoda w Warszawie i kurs euro?",
+        sample_swz_markdown,
+    )
+    assert answer == "Brak informacji w dostarczonej dokumentacji przetargowej."

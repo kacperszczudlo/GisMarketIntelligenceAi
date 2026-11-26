@@ -120,3 +120,28 @@ def test_should_validate_cpv_classification_minimum_code_length() -> None:
 
     with pytest.raises(ValidationError):
         CPVClassification(code="123")
+
+
+def test_should_reject_negative_budget_and_deadline_before_published() -> None:
+    now = datetime.now(timezone.utc)
+    with pytest.raises(ValidationError):
+        TenderNotice(
+            ocds_id="ocds-neg",
+            title="Test",
+            municipality_name="Gmina",
+            voivodeship="Mazowieckie",
+            estimated_budget_pln=-100.0,
+            date_published=now,
+            date_deadline=now + timedelta(days=1),
+        )
+
+    with pytest.raises(ValidationError):
+        TenderNotice(
+            ocds_id="ocds-bad-date",
+            title="Test",
+            municipality_name="Gmina",
+            voivodeship="Mazowieckie",
+            estimated_budget_pln=1000.0,
+            date_published=now,
+            date_deadline=now - timedelta(days=1),
+        )

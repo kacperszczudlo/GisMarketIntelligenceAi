@@ -54,17 +54,14 @@ def test_should_combine_dense_and_sparse_candidates_via_rrf_in_hybrid_search(
     )
 
 
-def test_should_compute_cosine_similarity_and_fallback_when_scoped_dense_search_is_empty(
+def test_should_return_empty_without_cross_tender_leakage_when_scoped_dense_search_is_empty(
     mocker: MockerFixture,
     mock_db_cursor: Any,
 ) -> None:
     # Arrange
     mock_embedder = mocker.MagicMock(spec=BgeM3Embedder)
     mock_embedder.embed_query.return_value = [1.0] + [0.0] * (EXPECTED_EMBEDDING_DIM - 1)
-    mock_db_cursor.fetchall.side_effect = [
-        [],
-        [("chunk-1", "parent-1", 0, "Wymóg formatu .str", {"section_title": "OPZ"}, 0.15)],
-    ]
+    mock_db_cursor.fetchall.return_value = []
     retriever = DenseRetriever(embedder=mock_embedder)
 
     # Act
@@ -76,22 +73,16 @@ def test_should_compute_cosine_similarity_and_fallback_when_scoped_dense_search_
     )
 
     # Assert
-    assert len(results) == 1
-    assert results[0]["id"] == "chunk-1"
-    assert results[0]["parent_id"] == "parent-1"
-    assert results[0]["distance"] == pytest.approx(0.15)
-    assert results[0]["score"] == pytest.approx(0.85)
-    assert results[0]["retrieval_mode"] == "dense"
-    assert mock_db_cursor.execute.call_count == 2
+    assert results == []
+    assert mock_db_cursor.execute.call_count == 1
 
 
 def test_should_sanitize_natural_query_and_execute_tsvector_search_in_sparse_retriever(
     mock_db_cursor: Any,
 ) -> None:
     # Arrange
-    mock_db_cursor.fetchall.side_effect = [
-        [],
-        [("chunk-2", "parent-2", 1, "Modernizacja bazy GESUT", {}, 2.4)],
+    mock_db_cursor.fetchall.return_value = [
+        ("chunk-2", "parent-2", 1, "Modernizacja bazy GESUT", {}, 2.4)
     ]
     retriever = SparseRetriever()
 
@@ -110,7 +101,7 @@ def test_should_sanitize_natural_query_and_execute_tsvector_search_in_sparse_ret
     assert results[0]["id"] == "chunk-2"
     assert results[0]["score"] == pytest.approx(2.4)
     assert results[0]["retrieval_mode"] == "sparse"
-    assert mock_db_cursor.execute.call_count == 2
+    assert mock_db_cursor.execute.call_count == 1
 
 
 def test_should_return_empty_list_when_sparse_query_has_no_valid_terms_or_db_fails(

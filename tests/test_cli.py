@@ -299,3 +299,9 @@ def test_should_fallback_to_default_metadata_when_lookup_raises_database_error(
     assert "sample" in title
     assert "Niepołomicach" in municipality
 
+
+def test_should_raise_value_error_when_explicit_ocds_id_not_found(mock_db_cursor: Any) -> None:
+    mock_db_cursor.fetchone.return_value = None
+    with pytest.raises(ValueError, match="Nie znaleziono"):
+        _lookup_procurement_metadata("ocds-does-not-exist-999")
+

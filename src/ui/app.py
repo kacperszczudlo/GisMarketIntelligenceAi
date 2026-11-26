@@ -186,7 +186,7 @@ def extract_tender_metrics(full_text: str, budget_pln: float) -> Dict[str, Any]:
     low = full_text.lower()
 
     # 1. KIO Risk & Format Score
-    if ".str" in low and "bez udostępnienia" in low or "bez udostepnienia" in low:
+    if ".str" in low and ("bez udostępnienia" in low or "bez udostepnienia" in low):
         kio_level = "HIGH"
         kio_label = "WYSOKIE"
         kio_color = "#dc2626"

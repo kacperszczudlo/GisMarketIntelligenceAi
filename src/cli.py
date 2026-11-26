@@ -394,6 +394,7 @@ def _lookup_procurement_metadata(ocds_id: str) -> tuple[str, str, str]:
                 row = cur.fetchone()
                 if row:
                     return str(row[0]), str(row[1]), str(row[2])
+                raise ValueError(f"Nie znaleziono postępowania o identyfikatorze: {ocds_id}")
 
             cur.execute(
                 "SELECT ocds_id, title, municipality_name FROM procurements WHERE ocds_id = 'ocds-148610-niepolomice' LIMIT 1;"
@@ -406,6 +407,8 @@ def _lookup_procurement_metadata(ocds_id: str) -> tuple[str, str, str]:
             row = cur.fetchone()
             if row:
                 return str(row[0]), str(row[1]), str(row[2])
+    except ValueError:
+        raise
     except Exception as exc:
         logger.debug("Could not lookup procurement metadata: %s", exc)
 

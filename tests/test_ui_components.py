@@ -233,3 +233,12 @@ def test_should_extract_tender_metrics_and_parse_report_sections(
     assert ".str" in sections["legal_barriers"]
     assert "Geo-System" in sections["competitors"]
     assert "KIO" in sections["recommendations"]
+
+
+def test_should_not_flag_high_str_risk_without_str_extension() -> None:
+    metrics = extract_tender_metrics(
+        "Dokumentacja przetargowa bez udostepnienia załącznika graficznego.",
+        budget_pln=100000.0,
+    )
+    assert metrics["kio_level"] != "HIGH"
+    assert metrics["has_lockin"] is False
