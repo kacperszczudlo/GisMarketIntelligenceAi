@@ -226,3 +226,19 @@ def test_should_return_no_info_message_for_unrelated_question(sample_swz_markdow
         sample_swz_markdown,
     )
     assert answer == "Brak informacji w dostarczonej dokumentacji przetargowej."
+
+
+def test_should_export_markdown_report_to_valid_multipage_pdf_bytes() -> None:
+    from src.inference.pdf_exporter import export_report_to_pdf_bytes
+
+    long_md = "# Raport przetargowy: ocds-148610-niepolomice\n\n" + "\n".join(
+        f"{idx}. Wymóg formalny nr {idx}: Zamawiający żąda formatu .str oraz kary 2%."
+        for idx in range(1, 70)
+    )
+    pdf_bytes = export_report_to_pdf_bytes(long_md)
+
+    assert pdf_bytes.startswith(b"%PDF-1.4\n")
+    assert pdf_bytes.rstrip().endswith(b"%%EOF")
+    assert b"/Count 2" in pdf_bytes
+    assert b"Strona 1/2" in pdf_bytes
+    assert b"Strona 2/2" in pdf_bytes
