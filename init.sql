@@ -61,3 +61,15 @@ WITH (m = 16, ef_construction = 64);
 
 CREATE INDEX IF NOT EXISTS idx_chunks_tsvector ON chunk_vectors USING GIN(content_tsvector);
 CREATE INDEX IF NOT EXISTS idx_chunks_payload ON chunk_vectors USING GIN(metadata_payload);
+
+-- 5. Tabela Użytkowników (Logowanie i role admin/user)
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    username VARCHAR(100) UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'user',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);

@@ -1,31 +1,35 @@
 from contextlib import contextmanager
+import threading
 from typing import Generator, Optional
 import psycopg2
 from psycopg2.extensions import connection, cursor
-from psycopg2.pool import SimpleConnectionPool
+from psycopg2.pool import ThreadedConnectionPool
 from src.config import settings
 
 
 class DatabaseManager:
-    """Manages PostgreSQL connection pooling and transactional cursors."""
+    """Manages thread-safe PostgreSQL connection pooling and transactional cursors."""
 
-    def __init__(self, minconn: int = 1, maxconn: int = 10) -> None:
+    def __init__(self, minconn: int = 1, maxconn: int = 20) -> None:
         self.minconn = minconn
         self.maxconn = maxconn
-        self._pool: Optional[SimpleConnectionPool] = None
+        self._pool: Optional[ThreadedConnectionPool] = None
+        self._lock = threading.Lock()
 
-    def _ensure_pool(self) -> SimpleConnectionPool:
-        """Lazily initializes the connection pool when first required."""
+    def _ensure_pool(self) -> ThreadedConnectionPool:
+        """Lazily initializes the thread-safe connection pool when first required."""
         if self._pool is None:
-            self._pool = SimpleConnectionPool(
-                minconn=self.minconn,
-                maxconn=self.maxconn,
-                host=settings.POSTGRES_HOST,
-                port=settings.POSTGRES_PORT,
-                dbname=settings.POSTGRES_DB,
-                user=settings.POSTGRES_USER,
-                password=settings.POSTGRES_PASSWORD,
-            )
+            with self._lock:
+                if self._pool is None:
+                    self._pool = ThreadedConnectionPool(
+                        minconn=self.minconn,
+                        maxconn=self.maxconn,
+                        host=settings.POSTGRES_HOST,
+                        port=settings.POSTGRES_PORT,
+                        dbname=settings.POSTGRES_DB,
+                        user=settings.POSTGRES_USER,
+                        password=settings.POSTGRES_PASSWORD,
+                    )
         return self._pool
 
     @contextmanager
