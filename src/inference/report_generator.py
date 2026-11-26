@@ -246,7 +246,7 @@ class TenderReportGenerator:
             if scored:
                 matched = [s for _, s in scored[:2]]
             else:
-                matched = sentences[:2]
+                return "Brak informacji w dostarczonej dokumentacji przetargowej."
 
         return f"{' '.join(matched[:2])} {citation_tag}"
 

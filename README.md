@@ -2,11 +2,11 @@
 
 Lokalny system RAG do analizy specyfikacji warunków zamówienia (SWZ), weryfikacji barier rynkowych i analizy konkurencji w polskich przetargach geodezyjnych oraz systemach informacji przestrzennej (SIP).
 
-[![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/)
-[![Orchestrator](https://img.shields.io/badge/Orchestrator-LlamaIndex-orange.svg)](https://www.llamaindex.ai/)
-[![PDF Parser](https://img.shields.io/badge/PDF_Parser-IBM_Docling-red.svg)](https://github.com/DS4SD/docling)
+[![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
+[![Backend](https://img.shields.io/badge/Backend-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
+[![Frontend](https://img.shields.io/badge/Frontend-React_18_%2B_Vite-61DAFB.svg)](https://react.dev/)
 [![Vector DB](https://img.shields.io/badge/Vector_DB-PostgreSQL_%2B_pgvector-blue.svg)](https://github.com/pgvector/pgvector)
-[![LLM Engine](https://img.shields.io/badge/LLM_Engine-Ollama_(Llama--3.1--8B)-black.svg)](https://ollama.com/)
+[![LLM Engine](https://img.shields.io/badge/LLM_Engine-Ollama_(gis--analyst)-black.svg)](https://ollama.com/)
 [![Evaluation](https://img.shields.io/badge/Evaluation-RAGAS-green.svg)](https://github.com/explodinggradients/ragas)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -52,10 +52,12 @@ flowchart TD
         M --> N[Przeindeksowanie kontekstu]
     end
 
-    subgraph Generation [Generowanie i ewaluacja]
-        N --> O[Ollama: Llama-3.1-8B-Instruct]
-        O --> P[Raport przetargowy]
-        P --> Q[Ewaluacja RAGAS: wierność faktom]
+    subgraph Generation [Generowanie, ewaluacja i aplikacja webowa]
+        N --> O[Ollama: gis-analyst]
+        O --> P[Raport przetargowy i eksport PDF]
+        P --> Q[Ewaluacja RAGAS: wierność >= 0.95]
+        Q --> R[FastAPI REST + SSE Streaming]
+        R --> S[React 18 + Vite SPA]
     end
 ```
 
@@ -65,13 +67,16 @@ flowchart TD
 
 | Warstwa | Technologia | Zastosowanie |
 | :--- | :--- | :--- |
-| Orkiestracja | LlamaIndex | Obsługa hierarchii Parent-Child, fuzji RRF i integracji z bazą wektorową. |
+| Backend API | FastAPI + Uvicorn (ASGI) | REST API (`/api/*`), streaming odpowiedzi czatu (SSE), serwowanie SPA oraz eksport PDF. |
+| Frontend UI | React 18 + Vite | Szybka aplikacja SPA (Cartographic Daylight UI), lokalny cache przetargów i historia czatu. |
+| Bezpieczeństwo | Argon2id + HMAC-SHA256 | Haszowanie haseł użytkowników, zarządzanie kontami pracowników i bezstanowe tokeny sesji. |
 | Parsowanie PDF | IBM Docling | Ekstrakcja tabel wielostronicowych do formatu Markdown z wykorzystaniem modeli DocLayNet i TableFormer. |
-| Baza danych | PostgreSQL 16 z rozszerzeniem pgvector | Przechowywanie relacyjnych metadanych postępowań oraz indeksów wektorowych HNSW. |
+| Baza danych | PostgreSQL 16 z rozszerzeniem pgvector | Przechowywanie relacyjnych metadanych postępowań, kont użytkowników oraz indeksów wektorowych HNSW. |
 | Model embeddingu | BAAI/BGE-M3 | Generowanie wektorów gęstych (1024 wymiary) i rzadkich (wagi leksykalne). |
 | Reranking | bge-reranker-v2-m3 | Cross-encoder filtrujący kandydatów do wąskiego kontekstu dla modelu LLM. |
-| Model językowy | Ollama (Llama-3.1-8B-Instruct Q4_K_M) | Generowanie raportu z ograniczeniem do faktów zawartych w dokumentacji. |
-| Ewaluacja | RAGAS | Weryfikacja wskaźników wierności faktograficznej (faithfulness) i trafności odpowiedzi. |
+| Model językowy | Ollama (`gis-analyst`) | Generowanie raportów, ustrukturyzowanych metryk JSON oraz strumieniowych odpowiedzi z uziemieniem w SWZ. |
+| Ewaluacja | RAGAS | Weryfikacja wskaźników wierności faktograficznej (faithfulness ≥ 0.95) i trafności odpowiedzi. |
+| Eksport raportów | `fpdf2` | Generowanie wielostronicowych raportów audytu PZP/KIO do formatu `.pdf`. |
 
 ---
 
@@ -117,27 +122,38 @@ Specyfikacja techniczna projektu znajduje się w katalogu `docs/`:
 ## Uruchomienie lokalne
 
 ### Wymagania
-* System operacyjny: Windows z WSL2 / Linux / macOS,
+* System operacyjny: Windows 10/11 / Linux / macOS,
 * Pamięć RAM: minimum 16 GB,
-* Zainstalowane środowiska: Python 3.11, Docker, Ollama.
+* Zainstalowane środowiska: Python 3.12, Node.js 20+, Docker, Ollama.
 
 ```bash
 # 1. Klonowanie repozytorium
-git clone https://github.com/twoj-login/GisMarketIntelligenceAi.git
+git clone https://github.com/kacperszczudlo/GisMarketIntelligenceAi.git
 cd GisMarketIntelligenceAi
 
-# 2. Uruchomienie bazy danych
+# 2. Uruchomienie bazy danych PostgreSQL + pgvector
 docker compose up -d
 
 # 3. Pobranie modelu językowego
-ollama pull llama3.1:8b-instruct-q4_K_M
+ollama pull gis-analyst
 
-# 4. Utworzenie środowiska wirtualnego
+# 4. Utworzenie środowiska wirtualnego i instalacja zależności Python
 python -m venv .venv
-source .venv/bin/activate  # w systemie Windows: .venv\Scripts\activate
-
-# 5. Instalacja zależności
+.venv\Scripts\activate  # Linux/macOS: source .venv/bin/activate
 pip install -r requirements.txt
+
+# 5. Instalacja i zbudowanie frontendu React (Vite)
+cd frontend
+npm install
+npm run build
+cd ..
+
+# 6. Uruchomienie aplikacji (FastAPI + React SPA na jednym porcie)
+python -m uvicorn src.api.app:app --host 127.0.0.1 --port 8000
+# Aplikacja dostępna pod http://127.0.0.1:8000
+
+# 7. Uruchomienie testów
+run_tests.bat  # lub: pytest
 ```
 
 ---

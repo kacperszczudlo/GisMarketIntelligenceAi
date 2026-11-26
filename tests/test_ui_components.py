@@ -233,3 +233,33 @@ def test_should_extract_tender_metrics_and_parse_report_sections(
     assert ".str" in sections["legal_barriers"]
     assert "Geo-System" in sections["competitors"]
     assert "KIO" in sections["recommendations"]
+
+
+def test_should_not_flag_high_str_risk_without_str_extension() -> None:
+    metrics = extract_tender_metrics(
+        "Dokumentacja przetargowa bez udostepnienia załącznika graficznego.",
+        budget_pln=100000.0,
+    )
+    assert metrics["kio_level"] != "HIGH"
+    assert metrics["has_lockin"] is False
+
+
+def test_should_render_clickable_procurements_table_without_checkboxes() -> None:
+    from src.ui.components import render_clickable_procurements_table
+
+    html_out = render_clickable_procurements_table(
+        rows=[
+            {
+                "ID": "ocds-148610-niepolomice",
+                "Zamawiający": "Gmina Niepołomice",
+                "Tytuł": "Modernizacja BDOT500",
+                "Województwo": "Małopolskie",
+                "Budżet PLN": 320000.0,
+                "Termin": "2026-11-20",
+            }
+        ],
+        session_token="tok123",
+    )
+    assert "tender-row" in html_out
+    assert "?session=tok123&tender=ocds-148610-niepolomice" in html_out
+    assert 'type="checkbox"' not in html_out

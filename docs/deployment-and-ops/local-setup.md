@@ -5,7 +5,7 @@
 * **System operacyjny**: Windows 10/11 (z WSL2 dla Dockera), Linux (Ubuntu 22.04+) lub macOS.
 * **Pamięć RAM**: minimum 16 GB.
 * **Procesor**: 4 rdzenie z obsługą instrukcji AVX2 lub Apple Silicon (M1/M2/M3).
-* **Narzędzia**: Python 3.11, Docker Desktop, Ollama.
+* **Narzędzia**: Python 3.12, Node.js 20+, Docker Desktop, Ollama.
 
 ---
 
@@ -40,8 +40,18 @@ docker ps
 
 ### Krok 4: Pobranie modelu w Ollama
 ```bash
-ollama pull llama3.1:8b-instruct-q4_K_M
+ollama pull gis-analyst
 ollama list
+```
+
+### Krok 5: Budowa frontendu React (Vite) i start serwera FastAPI
+```bash
+cd frontend
+npm install
+npm run build
+cd ..
+
+python -m uvicorn src.api.app:app --host 127.0.0.1 --port 8000
 ```
 
 ### Krok 5: Utworzenie pliku konfiguracyjnego `.env`

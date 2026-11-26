@@ -6,13 +6,15 @@ Architektura opiera się na otwartych komponentach uruchamianych lokalnie na sta
 
 | Warstwa | Stos lokalny | Alternatywa chmurowa | Uzasadnienie wyboru stosu lokalnego |
 | :--- | :--- | :--- | :--- |
-| Baza danych i wektorów | PostgreSQL 16 z pgvector (Docker) | Qdrant Cloud / Pinecone | Łączenie relacyjnych metadanych przetargów i indeksów wektorowych w jednym silniku bazodanowym bez opłat licencyjnych. |
+| Backend i API | FastAPI + Uvicorn (ASGI) | AWS API Gateway + Lambda | Natywne `async/await`, streaming SSE w czacie, serwowanie SPA i eksport raportów PDF (`fpdf2`). |
+| Frontend UI | React 18 + Vite SPA | Vercel / Next.js | Natychmiastowe filtrowanie, lokalny cache przetargów i trwała historia czatu bez przeładowań. |
+| Autoryzacja | Argon2id + HMAC-SHA256 | Auth0 / Clerk | Bezpieczne haszowanie odporne na GPU/ASIC i lekkie bezstanowe tokeny sesji w PostgreSQL. |
+| Baza danych i wektorów | PostgreSQL 16 z pgvector (Docker) | Qdrant Cloud / Pinecone | Łączenie relacyjnych metadanych przetargów, kont użytkowników i indeksów wektorowych w jednym silniku bez opłat licencyjnych. |
 | Parsowanie dokumentów | IBM Docling (DocLayNet, TableFormer) | LlamaParse API | Brak opłat za przetwarzane strony; lokalne rozpoznawanie tabel ze skanów i plików PDF. |
-| Orkiestracja | LlamaIndex Python | LangChain / LangGraph | Zoptymalizowane moduły do podziału Parent-Child, fuzji RRF i integracji z bazą pgvector. |
 | Model embeddingu | BAAI/BGE-M3 (lokalnie przez HuggingFace) | OpenAI text-embedding-3-large | Generowanie wektorów gęstych i wag leksykalnych w jednym modelu; okno kontekstowe do 8192 tokenów. |
 | Reranking | bge-reranker-v2-m3 (Cross-Encoder) | Cohere Rerank API | Weryfikacja trafności kandydatów na lokalnym procesorze bez wysyłania danych do podmiotów trzecich. |
-| Model językowy | Ollama: Llama-3.1-8B-Instruct (Q4_K_M) | GPT-4o / Claude 3.5 Sonnet | Przetwarzanie dokumentacji w sieci lokalnej; zużycie pamięci rzędu 4.7 GB RAM. |
-| Ewaluacja | Biblioteka RAGAS | Platformy ewaluacyjne SaaS | Weryfikacja wskaźnika wierności faktom bezpośrednio w skryptach testowych. |
+| Model językowy | Ollama: `gis-analyst` | GPT-4o / Claude 3.5 Sonnet | Przetwarzanie dokumentacji w sieci lokalnej z obsługą streamingu SSE i Structured Outputs JSON. |
+| Ewaluacja | Biblioteka RAGAS | Platformy ewaluacyjne SaaS | Weryfikacja wskaźnika wierności faktom (`faithfulness >= 0.95`) bezpośrednio w skryptach testowych. |
 
 ---
 

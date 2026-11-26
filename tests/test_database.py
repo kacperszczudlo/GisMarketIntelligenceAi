@@ -43,7 +43,7 @@ def test_should_initialize_connection_pool_lazily_and_return_connection_on_exit(
     fake_pool.getconn.return_value = fake_conn
 
     mock_pool_cls = mocker.patch(
-        "src.database.connection.SimpleConnectionPool",
+        "src.database.connection.ThreadedConnectionPool",
         return_value=fake_pool,
     )
     manager = DatabaseManager(minconn=POOL_MIN_CONN, maxconn=POOL_MAX_CONN)
@@ -72,7 +72,7 @@ def test_should_rollback_transaction_and_close_cursor_when_query_raises_error(
     fake_cursor = mocker.MagicMock(name="PooledCursor")
     fake_conn.cursor.return_value = fake_cursor
     fake_pool.getconn.return_value = fake_conn
-    mocker.patch("src.database.connection.SimpleConnectionPool", return_value=fake_pool)
+    mocker.patch("src.database.connection.ThreadedConnectionPool", return_value=fake_pool)
 
     manager = DatabaseManager(minconn=POOL_MIN_CONN, maxconn=POOL_MAX_CONN)
 
@@ -99,7 +99,7 @@ def test_should_execute_vector_insertion_and_cosine_distance_query_contract(
     fake_cursor.fetchone.return_value = (test_chunk_id, "Testowy chunk o BDOT500", 0.012)
     fake_conn.cursor.return_value = fake_cursor
     fake_pool.getconn.return_value = fake_conn
-    mocker.patch("src.database.connection.SimpleConnectionPool", return_value=fake_pool)
+    mocker.patch("src.database.connection.ThreadedConnectionPool", return_value=fake_pool)
 
     manager = DatabaseManager(minconn=POOL_MIN_CONN, maxconn=POOL_MAX_CONN)
     vec_1024 = [1.0] + [0.0] * (EMBEDDING_DIMENSION - 1)

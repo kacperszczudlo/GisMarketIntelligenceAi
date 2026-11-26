@@ -394,6 +394,7 @@ def _lookup_procurement_metadata(ocds_id: str) -> tuple[str, str, str]:
                 row = cur.fetchone()
                 if row:
                     return str(row[0]), str(row[1]), str(row[2])
+                raise ValueError(f"Nie znaleziono postępowania o identyfikatorze: {ocds_id}")
 
             cur.execute(
                 "SELECT ocds_id, title, municipality_name FROM procurements WHERE ocds_id = 'ocds-148610-niepolomice' LIMIT 1;"
@@ -406,6 +407,8 @@ def _lookup_procurement_metadata(ocds_id: str) -> tuple[str, str, str]:
             row = cur.fetchone()
             if row:
                 return str(row[0]), str(row[1]), str(row[2])
+    except ValueError:
+        raise
     except Exception as exc:
         logger.debug("Could not lookup procurement metadata: %s", exc)
 
@@ -475,7 +478,12 @@ async def _run_analyze(
     if output:
         out_path = Path(output)
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(report.markdown_report, encoding="utf-8")
+        if out_path.suffix.lower() == ".pdf":
+            from src.inference.pdf_exporter import export_report_to_pdf_bytes
+
+            out_path.write_bytes(export_report_to_pdf_bytes(report.markdown_report))
+        else:
+            out_path.write_text(report.markdown_report, encoding="utf-8")
         print(f"[OK] Zapisano raport w pliku: {out_path.resolve()}")
     else:
         print(report.markdown_report)

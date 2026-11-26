@@ -72,8 +72,6 @@ class SparseRetriever:
             return []
 
         rows = self._execute_query(tsquery_str, top_k=top_k, parent_id=parent_id, procurement_id=procurement_id)
-        if not rows and procurement_id and procurement_id.lower() != "sample":
-            rows = self._execute_query(tsquery_str, top_k=top_k, parent_id=parent_id, procurement_id=None)
 
         results: List[Dict[str, Any]] = []
         for r in rows:

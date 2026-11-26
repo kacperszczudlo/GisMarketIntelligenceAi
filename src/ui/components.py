@@ -1,6 +1,7 @@
 import html
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+from urllib.parse import quote
 
 
 def _compact_html(raw_html: str) -> str:
@@ -152,9 +153,10 @@ def get_glassmorphism_stylesheet() -> str:
             to { transform: scaleY(1); }
         }
 
-        /* Hide Streamlit promotional popups, toasts, and toolbar chrome */
+        /* Hide Streamlit promotional popups, toasts, form "Press Enter" hint, heading anchor links, and toolbar chrome */
         #MainMenu, footer, [data-testid="stToolbar"], [data-testid="stDecoration"],
-        [data-testid="stNotification"], .stToast, div[data-testid="stStatusWidget"] {
+        [data-testid="stNotification"], .stToast, div[data-testid="stStatusWidget"],
+        [data-testid="InputInstructions"], [data-testid="stHeaderActionElements"] {
             display: none !important;
             visibility: hidden !important;
             height: 0 !important;
@@ -177,19 +179,54 @@ def get_glassmorphism_stylesheet() -> str:
         .block-container {
             padding-top: 0.75rem !important;
             padding-bottom: 3rem !important;
-            padding-left: 2rem !important;
-            padding-right: 2rem !important;
+            padding-left: clamp(0.75rem, 2.5vw, 2rem) !important;
+            padding-right: clamp(0.75rem, 2.5vw, 2rem) !important;
             max-width: 1460px !important;
         }
 
-        /* Sidebar Styling */
+        h1, h2, h3 {
+            text-wrap: balance;
+            letter-spacing: -0.02em;
+        }
+
+        p, li {
+            line-height: 1.5;
+            text-wrap: pretty;
+        }
+
+        /* Tabular numerals for KPIs, budgets, and tables */
+        [data-testid="stMetricValue"], table, td, th {
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Compact Sidebar Styling */
         [data-testid="stSidebar"] {
             background: #ffffff !important;
             border-right: 1px solid var(--border-hairline) !important;
+            min-width: 228px !important;
+            max-width: 248px !important;
+            width: 236px !important;
         }
 
         [data-testid="stSidebar"] > div:first-child {
             padding-top: 0.75rem !important;
+            padding-left: 0.85rem !important;
+            padding-right: 0.85rem !important;
+        }
+
+        /* Clickable Tender Table Rows (no checkboxes) */
+        tr.tender-row {
+            cursor: pointer !important;
+            transition: background-color 120ms ease !important;
+        }
+        tr.tender-row:hover {
+            background-color: #eff6ff !important;
+        }
+        a.tender-row-link {
+            color: inherit !important;
+            text-decoration: none !important;
+            display: block !important;
+            width: 100% !important;
         }
 
         /* Architectural Surface Layers (Frosted Glass + Crisp Hairline Borders) */
@@ -291,9 +328,10 @@ def get_glassmorphism_stylesheet() -> str:
             font-weight: 700 !important;
         }
 
-        /* Text Input Field */
-        div[data-baseweb="input"] > div {
-            min-height: 44px !important;
+        /* Text Input & Textarea Fields */
+        div[data-baseweb="input"] > div,
+        div[data-baseweb="textarea"] > div {
+            min-height: 48px !important;
             background-color: #ffffff !important;
             border: 1.5px solid #64748b !important;
             border-radius: 10px !important;
@@ -302,63 +340,233 @@ def get_glassmorphism_stylesheet() -> str:
             box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05) !important;
         }
 
-        div[data-baseweb="input"] > div:focus-within {
+        div[data-baseweb="input"] > div:focus-within,
+        div[data-baseweb="textarea"] > div:focus-within {
             border-color: #2563eb !important;
             box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16) !important;
         }
 
-        div[data-baseweb="input"] input {
+        div[data-baseweb="input"] input,
+        div[data-baseweb="textarea"] textarea {
             color: #0f172a !important;
-            font-size: 0.9rem !important;
+            font-size: 0.95rem !important;
             font-weight: 500 !important;
+            line-height: 1.5 !important;
         }
 
-        .stSelectbox label, .stTextInput label, .stNumberInput label {
+        div[data-baseweb="input"] input::placeholder,
+        div[data-baseweb="textarea"] textarea::placeholder {
+            color: #475569 !important;
+            opacity: 1 !important;
+        }
+
+        .stSelectbox label, .stTextInput label, .stTextArea label, .stNumberInput label {
             color: #0f172a !important;
             font-weight: 700 !important;
-            font-size: 0.8rem !important;
+            font-size: 0.84rem !important;
             letter-spacing: -0.01em !important;
             margin-bottom: 4px !important;
         }
 
-        /* Buttons: Restrained Deep Slate Primary & Crisp Secondary Pills */
-        .stButton > button {
-            min-height: 44px !important;
-            background: #0f172a !important;
-            color: #ffffff !important;
-            border: 1px solid #0f172a !important;
+        /* Buttons: Distinct Primary (active/CTA) vs Secondary (inactive/neutral) with 48px touch target */
+        .stButton > button,
+        .stFormSubmitButton > button {
+            min-height: 48px !important;
             border-radius: 10px !important;
             padding: 0.5rem 1.25rem !important;
             font-weight: 600 !important;
-            font-size: 0.86rem !important;
-            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.14) !important;
-            transition: all 150ms var(--ease-out-quint) !important;
+            font-size: 0.88rem !important;
+            transition: background-color 150ms var(--ease-out-quint), border-color 150ms var(--ease-out-quint), transform 120ms var(--ease-out-quint), box-shadow 150ms var(--ease-out-quint) !important;
         }
 
-        .stButton > button:hover {
-            background: #1e293b !important;
-            border-color: #1e293b !important;
+        .stButton > button[kind="primary"],
+        .stFormSubmitButton > button[kind="primary"],
+        button[data-testid="stBaseButton-primary"],
+        button[data-testid="baseButton-primary"] {
+            background: #2563eb !important;
+            color: #ffffff !important;
+            border: 1.5px solid #1d4ed8 !important;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.24) !important;
+        }
+
+        .stButton > button[kind="primary"]:hover,
+        .stFormSubmitButton > button[kind="primary"]:hover,
+        button[data-testid="stBaseButton-primary"]:hover,
+        button[data-testid="baseButton-primary"]:hover {
+            background: #1d4ed8 !important;
+            border-color: #1e40af !important;
             transform: translateY(-1px) !important;
-            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.22) !important;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.32) !important;
         }
 
-        .stButton > button:active {
+        .stButton > button[kind="secondary"],
+        .stFormSubmitButton > button[kind="secondary"],
+        button[data-testid="stBaseButton-secondary"],
+        button[data-testid="baseButton-secondary"] {
+            background: #ffffff !important;
+            color: #0f172a !important;
+            border: 1.5px solid #cbd5e1 !important;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
+        }
+
+        .stButton > button[kind="secondary"]:hover,
+        .stFormSubmitButton > button[kind="secondary"]:hover,
+        button[data-testid="stBaseButton-secondary"]:hover,
+        button[data-testid="baseButton-secondary"]:hover {
+            background: #f8fafc !important;
+            border-color: #0f172a !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 3px 10px rgba(15, 23, 42, 0.1) !important;
+        }
+
+        .stButton > button:focus-visible,
+        .stFormSubmitButton > button:focus-visible,
+        .stDownloadButton > button:focus-visible {
+            outline: 2px solid #2563eb !important;
+            outline-offset: 2px !important;
+        }
+
+        .stButton > button:active,
+        .stFormSubmitButton > button:active {
             transform: scale(0.98) !important;
         }
 
         .stDownloadButton > button {
-            min-height: 40px !important;
+            min-height: 44px !important;
             background: #ffffff !important;
             color: #0f172a !important;
             border: 1.5px solid #cbd5e1 !important;
-            border-radius: 9px !important;
+            border-radius: 10px !important;
             font-weight: 600 !important;
-            font-size: 0.82rem !important;
+            font-size: 0.85rem !important;
         }
 
         .stDownloadButton > button:hover {
             border-color: #0f172a !important;
             background: #f8fafc !important;
+        }
+
+        /* Data Editor & Tables */
+        [data-testid="stDataFrame"],
+        [data-testid="stDataEditor"] {
+            border: 1px solid var(--border-hairline) !important;
+            border-radius: 12px !important;
+            overflow: hidden !important;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04) !important;
+        }
+
+        /* Uniform 48px height for all standard inputs, selects, and number inputs */
+        div[data-baseweb="input"] > div,
+        div[data-baseweb="select"] > div,
+        [data-testid="stNumberInput"] > div > div {
+            min-height: 48px !important;
+            height: 48px !important;
+            box-sizing: border-box !important;
+        }
+
+        /* Sticky Continuous Chat Composer pinned at the bottom of the viewport */
+        [data-testid="stVerticalBlock"]:has(> [data-testid="stElementContainer"] .sticky-chat-marker),
+        [data-testid="stVerticalBlock"]:has(> .element-container .sticky-chat-marker) {
+            position: sticky !important;
+            bottom: 0.75rem !important;
+            z-index: 40 !important;
+            background: rgba(255, 255, 255, 0.97) !important;
+            backdrop-filter: blur(12px) !important;
+            -webkit-backdrop-filter: blur(12px) !important;
+            border: 1.5px solid #cbd5e1 !important;
+            border-radius: 16px !important;
+            box-shadow: 0 8px 30px rgba(15, 23, 42, 0.12) !important;
+        }
+
+        /* Unified Antigravity-style Chat Composer (direct selectors compatible with Streamlit 1.67+) */
+        div[data-testid="stTextArea"]:has(textarea[aria-label="Pytanie do dokumentacji"]) div[data-baseweb="textarea"],
+        div[data-testid="stTextArea"]:has(textarea[aria-label="Pytanie do dokumentacji"]) div[data-baseweb="textarea"] > div,
+        div[data-testid="stTextArea"]:has(textarea[aria-label="Pytanie do dokumentacji"]) div[data-baseweb="base-input"] {
+            border: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            padding: 0 !important;
+            min-height: 0 !important;
+            height: auto !important;
+        }
+
+        [data-testid="stHorizontalBlock"]:has([data-testid="stPopover"]) {
+            align-items: center !important;
+            gap: 8px !important;
+        }
+
+        [data-testid="stHorizontalBlock"]:has([data-testid="stPopover"]) > div,
+        [data-testid="stHorizontalBlock"]:has([data-testid="stPopover"]) [data-testid="stElementContainer"],
+        [data-testid="stHorizontalBlock"]:has([data-testid="stPopover"]) [data-testid="stMarkdown"] {
+            margin: 0 !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+        }
+
+        [data-testid="stHorizontalBlock"]:has([data-testid="stPopover"]) [data-testid="stPopover"] > button,
+        [data-testid="stHorizontalBlock"]:has([data-testid="stPopover"]) div[data-baseweb="select"] > div,
+        [data-testid="stHorizontalBlock"]:has([data-testid="stPopover"]) .chat-model-pill {
+            min-height: 38px !important;
+            height: 38px !important;
+            max-height: 38px !important;
+            border-radius: 9px !important;
+            font-size: 0.8rem !important;
+            font-weight: 600 !important;
+            background: #f8fafc !important;
+            border: 1px solid #e2e8f0 !important;
+            box-shadow: none !important;
+            box-sizing: border-box !important;
+            margin: 0 !important;
+        }
+
+        [data-testid="stHorizontalBlock"]:has([data-testid="stPopover"]) [data-testid="stPopover"] > button:hover,
+        [data-testid="stHorizontalBlock"]:has([data-testid="stPopover"]) div[data-baseweb="select"] > div:hover {
+            background: #eff6ff !important;
+            border-color: #2563eb !important;
+            color: #1d4ed8 !important;
+        }
+
+        [data-testid="stHorizontalBlock"]:has([data-testid="stPopover"]) button[kind="primary"],
+        [data-testid="stHorizontalBlock"]:has([data-testid="stPopover"]) button[data-testid="stBaseButton-primary"],
+        [data-testid="stHorizontalBlock"]:has([data-testid="stPopover"]) button[data-testid="baseButton-primary"] {
+            min-height: 38px !important;
+            height: 38px !important;
+            max-height: 38px !important;
+            width: 38px !important;
+            min-width: 38px !important;
+            padding: 0 !important;
+            border-radius: 10px !important;
+            font-size: 1rem !important;
+            line-height: 1 !important;
+            margin: 0 0 0 auto !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+
+        /* Responsive Breakpoints (Tablet & Mobile <= 768px, Small Desktop <= 1024px) */
+        @media (max-width: 1024px) {
+            .glass-layer-2, .glass-layer-3 {
+                padding: 16px !important;
+            }
+        }
+
+        @media (max-width: 768px) {
+            [data-testid="stHorizontalBlock"] {
+                flex-wrap: wrap !important;
+                gap: 8px !important;
+            }
+            [data-testid="stHorizontalBlock"] > [data-testid="column"],
+            [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+                min-width: 100% !important;
+                flex: 1 1 100% !important;
+            }
+            .glass-layer-1, .glass-layer-2, .glass-layer-3 {
+                padding: 14px !important;
+                border-radius: 12px !important;
+            }
         }
 
         /* Chips */
@@ -403,20 +611,25 @@ def get_glassmorphism_stylesheet() -> str:
     """
 
 
-def render_brand_sidebar_header() -> str:
-    """Renders the compact geometric logo and app title in the top-left of the sidebar."""
+def render_brand_sidebar_header(href: Optional[str] = None) -> str:
+    """Renders the compact geometric logo and app title, optionally wrapped as a clickable home link."""
     logo_svg = get_svg_icon("brand-mark", size=24, color="#0f172a")
-    return _compact_html(f"""
-    <div style="display:flex;align-items:center;gap:12px;padding:4px 4px 16px 4px;border-bottom:1px solid #e2e8f0;margin-bottom:16px;">
-        <div style="width:40px;height:40px;border-radius:10px;background:#f8fafc;border:1.5px solid #cbd5e1;display:flex;align-items:center;justify-content:center;">
-            {logo_svg}
-        </div>
-        <div>
-            <div style="font-size:0.98rem;font-weight:800;color:#0f172a;letter-spacing:-0.02em;line-height:1.15;">GisMarket</div>
-            <div style="font-size:0.72rem;font-weight:600;color:#64748b;">Intelligence AI</div>
-        </div>
-    </div>
-    """)
+    inner = (
+        f'<div style="display:flex;align-items:center;gap:10px;padding:4px 4px 12px 4px;border-bottom:1px solid #e2e8f0;margin-bottom:12px;">'
+        f'<div style="width:44px;height:44px;border-radius:11px;background:#f8fafc;border:1.5px solid #cbd5e1;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'
+        f'{logo_svg}</div>'
+        f'<div>'
+        f'<div style="font-size:0.96rem;font-weight:800;color:#0f172a;letter-spacing:-0.02em;line-height:1.15;">GisMarket</div>'
+        f'<div style="font-size:0.7rem;font-weight:600;color:#64748b;">Intelligence AI</div>'
+        f'</div></div>'
+    )
+    if href:
+        safe_href = html.escape(href, quote=True)
+        return _compact_html(
+            f'<a href="{safe_href}" target="_self" title="Przejdź do pulpitu (lista przetargów)" '
+            f'style="text-decoration:none;color:inherit;display:block;">{inner}</a>'
+        )
+    return _compact_html(inner)
 
 
 def render_top_utility_bar(
@@ -478,7 +691,7 @@ def render_kpi_stat_card(
     svg = get_svg_icon(icon_name, size=20, color=color_hex)
     delay_ms = stagger_index * 40
     return _compact_html(f"""
-    <div class="glass-layer-2" style="padding:16px 18px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;animation-delay:{delay_ms}ms;">
+    <div class="glass-layer-2" style="padding:16px 18px;min-height:114px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;animation-delay:{delay_ms}ms;">
         <div style="min-width:0;">
             <div style="font-size:0.76rem;font-weight:600;color:#64748b;margin-bottom:4px;">
                 {html.escape(label)}
@@ -769,6 +982,72 @@ def render_tender_card(
                 {wallet_svg}
                 <span>Budżet: <strong style="color:{budget_color};font-variant-numeric:tabular-nums;">{budget_str}</strong></span>
             </span>
+        </div>
+    </div>
+    """)
+
+
+def render_clickable_procurements_table(rows: List[Dict[str, Any]], session_token: str) -> str:
+    """Renders a clickable procurements table with no checkboxes; clicking any row opens the tender."""
+    building_svg = get_svg_icon("building", size=16, color="#334155")
+    safe_tok = quote(session_token, safe="")
+
+    tbody = ""
+    for row in rows:
+        row_id = str(row.get("ID", ""))
+        href = f"?session={safe_tok}&tender={quote(row_id, safe='')}"
+        short_id = html.escape(format_short_ocds_id(row_id))
+        muni = html.escape(str(row.get("Zamawiający", "")))
+        title = html.escape(str(row.get("Tytuł", "")))
+        voiv = html.escape(str(row.get("Województwo", "")))
+        deadline = html.escape(str(row.get("Termin", ""))[:10])
+        budget_val = float(row.get("Budżet PLN", 0.0) or 0.0)
+        budget_str = f"{budget_val:,.0f} PLN".replace(",", " ") if budget_val > 0 else "Wg SWZ"
+
+        def _cell(inner_html: str, extra_style: str = "") -> str:
+            return (
+                f"<td style='padding:0;{extra_style}'>"
+                f"<a class='tender-row-link' href='{href}' target='_self' style='padding:12px 14px;'>"
+                f"{inner_html}</a></td>"
+            )
+
+        muni_cell = _cell(
+            f"<div style='display:flex;align-items:center;gap:10px;'>"
+            f"<div style='width:30px;height:30px;border-radius:8px;background:#f1f5f9;border:1px solid #e2e8f0;"
+            f"display:flex;align-items:center;justify-content:center;flex-shrink:0;'>{building_svg}</div>"
+            f"<span style='font-weight:700;color:#0f172a;font-size:0.84rem;'>{muni}</span></div>"
+        )
+        title_cell = _cell(f"<span style='color:#334155;font-size:0.84rem;font-weight:500;'>{title}</span>", "max-width:440px;")
+        voiv_cell = _cell(f"<span style='color:#475569;font-size:0.82rem;'>{voiv}</span>")
+        budget_cell = _cell(f"<span style='font-weight:700;color:#0f172a;font-variant-numeric:tabular-nums;font-size:0.84rem;'>{budget_str}</span>")
+        deadline_cell = _cell(f"<span style='font-family:\"JetBrains Mono\",monospace;font-size:0.78rem;color:#475569;'>{deadline}</span>")
+        id_cell = _cell(f"<span style='font-family:\"JetBrains Mono\",monospace;font-size:0.75rem;color:#64748b;'>{short_id}</span>")
+
+        tbody += f"<tr class='tender-row' style='border-bottom:1px solid #f1f5f9;'>{muni_cell}{title_cell}{voiv_cell}{budget_cell}{deadline_cell}{id_cell}</tr>"
+
+    return _compact_html(f"""
+    <div class="glass-layer-2" style="padding:18px 20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div>
+                <h3 style="margin:0;font-size:1.05rem;font-weight:800;color:#0f172a;">Lista postępowań przetargowych</h3>
+                <div style="font-size:0.78rem;color:#64748b;margin-top:2px;">Kliknij dowolny wiersz, aby otworzyć pełny audyt SWZ/OPZ i pytania AI</div>
+            </div>
+            <span style="font-size:0.76rem;font-weight:700;color:#0f172a;background:#f1f5f9;border:1px solid #cbd5e1;padding:4px 10px;border-radius:6px;">Pozycji: {len(rows)}</span>
+        </div>
+        <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;text-align:left;">
+                <thead>
+                    <tr style="border-bottom:1px solid #e2e8f0;color:#64748b;font-size:0.73rem;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;">
+                        <th style="padding:10px 14px;">Zamawiający</th>
+                        <th style="padding:10px 14px;">Przedmiot zamówienia</th>
+                        <th style="padding:10px 14px;">Województwo</th>
+                        <th style="padding:10px 14px;">Budżet</th>
+                        <th style="padding:10px 14px;">Termin</th>
+                        <th style="padding:10px 14px;">Nr ref.</th>
+                    </tr>
+                </thead>
+                <tbody>{tbody}</tbody>
+            </table>
         </div>
     </div>
     """)

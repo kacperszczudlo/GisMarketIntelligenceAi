@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID, uuid4
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class CPVClassification(BaseModel):
@@ -35,7 +35,7 @@ class TenderNotice(BaseModel):
     title: str = Field(..., min_length=1)
     municipality_name: str = Field(..., min_length=1)
     voivodeship: str = Field(..., min_length=1)
-    estimated_budget_pln: Optional[float] = None
+    estimated_budget_pln: Optional[float] = Field(default=None, ge=0.0)
     cpv_codes: List[str] = Field(default_factory=list)
     date_published: datetime
     date_deadline: datetime
@@ -48,6 +48,14 @@ class TenderNotice(BaseModel):
         if not v.strip():
             raise ValueError("Field cannot be empty or whitespace only")
         return v.strip()
+
+    @model_validator(mode="after")
+    def validate_deadline_after_published(self) -> "TenderNotice":
+        pub = self.date_published if self.date_published.tzinfo else self.date_published.replace(tzinfo=timezone.utc)
+        dead = self.date_deadline if self.date_deadline.tzinfo else self.date_deadline.replace(tzinfo=timezone.utc)
+        if dead < pub:
+            raise ValueError("date_deadline cannot be earlier than date_published")
+        return self
 
     def is_deadline_past(self) -> bool:
         """Checks if tender submission deadline has passed."""
