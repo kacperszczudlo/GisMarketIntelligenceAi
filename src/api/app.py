@@ -246,21 +246,17 @@ async def _build_tender_summary(ocds_id: str) -> Dict[str, Any]:
         ) or "Brak dokumentów w bazie."
 
     generator = TenderReportGenerator()
-    ollama_online = await OllamaClient().check_health()
     report = await generator.generate(
         procurement_id=ocds_id,
         title=tender["title"],
         municipality=tender["municipality"],
         context=full_ctx,
-        prompt_override=build_universal_report_prompt(
-            full_ctx[:4500], tender["title"], tender["municipality"]
-        ) if ollama_online else None,
-        use_fast_synthesis=not ollama_online,
+        use_fast_synthesis=True,
     )
     guard = RagasGuard(min_faithfulness=0.95)
     eval_res = guard.evaluate_claims_grounding(report.markdown_report, [full_ctx])
     sections = _parse_report_sections(report.raw_llm_output)
-    metrics = await _enrich_metrics_with_llm(full_ctx, _extract_tender_metrics(full_ctx))
+    metrics = _extract_tender_metrics(full_ctx)
 
     summary_payload = {
         "tender": tender,
@@ -675,12 +671,32 @@ async def api_ask_procurement_stream(
 
 
 @app.get("/api/procurements/{ocds_id}/report.pdf")
-async def api_download_pdf(ocds_id: str, _user: UserRecord = Depends(get_current_user)) -> Response:
-    if ocds_id not in _PDF_CACHE:
+async def api_download_pdf(
+    ocds_id: str,
+    use_llm: bool = Query(default=False),
+    _user: UserRecord = Depends(get_current_user),
+) -> Response:
+    cache_key = f"{ocds_id}:{'llm' if use_llm else 'fast'}"
+    if cache_key not in _PDF_CACHE:
         summary = await _build_tender_summary(ocds_id)
-        _PDF_CACHE[ocds_id] = export_report_to_pdf_bytes(summary["markdown_report"])
+        md_report = summary["markdown_report"]
+        if use_llm and await OllamaClient().check_health():
+            tender = summary["tender"]
+            full_ctx = summary["full_context"]
+            llm_report = await TenderReportGenerator().generate(
+                procurement_id=ocds_id,
+                title=tender["title"],
+                municipality=tender["municipality"],
+                context=full_ctx,
+                prompt_override=build_universal_report_prompt(
+                    full_ctx[:4500], tender["title"], tender["municipality"]
+                ),
+                use_fast_synthesis=False,
+            )
+            md_report = llm_report.markdown_report
+        _PDF_CACHE[cache_key] = export_report_to_pdf_bytes(md_report)
     return Response(
-        content=_PDF_CACHE[ocds_id],
+        content=_PDF_CACHE[cache_key],
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="raport_{ocds_id}.pdf"'},
     )

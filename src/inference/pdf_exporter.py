@@ -1,119 +1,98 @@
-"""Pure-Python multi-page PDF-1.4 exporter for Tender Intelligence reports."""
+"""Unicode-safe multi-page PDF exporter using fpdf2 with TrueType Polish font support."""
 
+from pathlib import Path
 import re
-import textwrap
-from typing import List, Tuple
+from typing import Optional, Tuple
 
-_PUNCT_TRANS = str.maketrans(
-    "–—„”•",
-    "--\"\"-",
-)
-
-LINES_PER_PAGE = 46
-WRAP_WIDTH = 86
+from fpdf import FPDF
 
 
-def _normalize_pdf_text(text: str) -> str:
-    clean = text.translate(_PUNCT_TRANS)
-    return clean.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+def _find_unicode_fonts() -> Tuple[Optional[str], Optional[str]]:
+    """Finds a system TrueType font pair (regular, bold) supporting Polish diacritics."""
+    candidates = [
+        (r"C:\Windows\Fonts\arial.ttf", r"C:\Windows\Fonts\arialbd.ttf"),
+        (r"C:\Windows\Fonts\segoeui.ttf", r"C:\Windows\Fonts\segoeuib.ttf"),
+        (r"C:\Windows\Fonts\calibri.ttf", r"C:\Windows\Fonts\calibrib.ttf"),
+        ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+        ("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"),
+    ]
+    for reg, bold in candidates:
+        if Path(reg).exists():
+            return reg, (bold if Path(bold).exists() else reg)
+    return None, None
 
 
-def _markdown_to_wrapped_lines(markdown_text: str) -> List[Tuple[str, bool]]:
-    """Converts markdown report text into wrapped (line_text, is_heading) tuples."""
-    result: List[Tuple[str, bool]] = []
-    for raw_line in markdown_text.splitlines():
+class _TenderAuditPDF(FPDF):
+    """Custom FPDF layout with clean header/footer for PZP & GIS audit reports."""
+
+    def __init__(self, font_family: str) -> None:
+        super().__init__(format="A4", unit="mm")
+        self._font_family_name = font_family
+        self.set_auto_page_break(auto=True, margin=18)
+        self.set_margins(16, 16, 16)
+
+    def footer(self) -> None:
+        self.set_y(-13)
+        self.set_font(self._font_family_name, size=8)
+        self.set_text_color(110, 118, 129)
+        self.cell(0, 6, f"Strona {self.page_no()}/{{nb}} | GisMarket Intelligence AI", align="L")
+
+
+def export_report_to_pdf_bytes(markdown_report: str) -> bytes:
+    """Renders a Markdown procurement audit report into valid multi-page UTF-8 PDF bytes."""
+    reg_font, bold_font = _find_unicode_fonts()
+    use_unicode = reg_font is not None
+    family = "PolishSans" if use_unicode else "Helvetica"
+
+    pdf = _TenderAuditPDF(font_family=family)
+    pdf.pdf_version = "1.4"
+    pdf.alias_nb_pages()
+
+    if use_unicode and reg_font and bold_font:
+        pdf.add_font(family, "", reg_font)
+        pdf.add_font(family, "B", bold_font)
+
+    pdf.add_page()
+    text = (markdown_report or "Brak treści raportu.").strip()
+
+    for raw_line in text.splitlines():
         stripped = raw_line.strip()
         if not stripped:
-            result.append(("", False))
-            continue
-        if stripped == "---":
-            result.append(("-" * 72, False))
+            pdf.ln(3)
             continue
 
+        if stripped == "---":
+            pdf.set_draw_color(205, 213, 224)
+            y = pdf.get_y() + 1.5
+            pdf.line(16, y, 194, y)
+            pdf.ln(5)
+            continue
+
+        is_h1 = stripped.startswith("# ")
         is_heading = stripped.startswith("#")
         clean = re.sub(r"^#{1,6}\s*", "", stripped)
         clean = re.sub(r"\*\*(.*?)\*\*", r"\1", clean)
         clean = re.sub(r"`(.*?)`", r"\1", clean)
         if clean.startswith(("- ", "* ")):
-            clean = "- " + clean[2:].strip()
+            clean = "• " + clean[2:].strip()
 
-        wrapped = textwrap.wrap(clean, width=WRAP_WIDTH) or [""]
-        for w in wrapped:
-            result.append((w, is_heading))
-    return result
+        if not use_unicode:
+            clean = clean.translate(str.maketrans("ąćęłńóśźżĄĆĘŁŃÓŚŹŻ–—„”•", "acelnoszzACELNOSZZ--\"\"-"))
 
+        if is_h1:
+            pdf.set_font(family, "B", 14)
+            pdf.set_text_color(15, 23, 42)
+            pdf.multi_cell(0, 7, clean, new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(1)
+        elif is_heading:
+            pdf.ln(2)
+            pdf.set_font(family, "B", 11.5)
+            pdf.set_text_color(30, 58, 138)
+            pdf.multi_cell(0, 6, clean, new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(1)
+        else:
+            pdf.set_font(family, "", 10)
+            pdf.set_text_color(30, 41, 59)
+            pdf.multi_cell(0, 5.4, clean, new_x="LMARGIN", new_y="NEXT")
 
-def export_report_to_pdf_bytes(markdown_report: str) -> bytes:
-    """Renders a Markdown procurement audit report into valid multi-page PDF-1.4 bytes."""
-    lines = _markdown_to_wrapped_lines(markdown_report or "Brak tresci raportu.")
-    pages: List[List[Tuple[str, bool]]] = [
-        lines[i : i + LINES_PER_PAGE] for i in range(0, max(1, len(lines)), LINES_PER_PAGE)
-    ]
-
-    # Object 1: Catalog, Object 2: Pages, Object 3: Regular Font, Object 4: Bold Font, Object 5: CP1250 Encoding
-    objects: List[bytes] = [
-        b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
-        b"",  # Placeholder for Pages object
-        b"3 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding 5 0 R >>\nendobj\n",
-        b"4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding 5 0 R >>\nendobj\n",
-        (
-            b"5 0 obj\n<< /Type /Encoding /BaseEncoding /WinAnsiEncoding "
-            b"/Differences [ 140 /Sacute 143 /Zacute 156 /sacute 159 /zacute "
-            b"163 /Lslash 165 /Aogonek 175 /Zdotaccent 179 /lslash 185 /aogonek "
-            b"191 /zdotaccent 198 /Cacute 202 /Eogonek 209 /Nacute 211 /Oacute "
-            b"230 /cacute 234 /eogonek 241 /nacute 243 /oacute ] >>\nendobj\n"
-        ),
-    ]
-
-    page_obj_ids: List[int] = []
-    next_id = 6
-
-    for page_idx, page_lines in enumerate(pages, 1):
-        content_ops = ["BT", "50 790 Td", "14 TL"]
-        for line_idx, (line_text, is_heading) in enumerate(page_lines):
-            font_op = "/F2 11 Tf" if is_heading else "/F1 10 Tf"
-            escaped = _normalize_pdf_text(line_text)
-            if line_idx == 0:
-                content_ops.append(f"{font_op} ({escaped}) Tj")
-            else:
-                content_ops.append(f"T* {font_op} ({escaped}) Tj")
-
-        # Footer with page number
-        footer = _normalize_pdf_text(f"Strona {page_idx}/{len(pages)} | GisMarket Intelligence AI")
-        content_ops.append(f"ET\nBT /F1 8 Tf 50 32 Td ({footer}) Tj ET")
-        stream_data = "\n".join(content_ops).encode("cp1250", errors="replace")
-
-        page_id = next_id
-        content_id = next_id + 1
-        next_id += 2
-        page_obj_ids.append(page_id)
-
-        objects.append(
-            f"{page_id} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
-            f"/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents {content_id} 0 R >>\nendobj\n".encode("ascii")
-        )
-        objects.append(
-            f"{content_id} 0 obj\n<< /Length {len(stream_data)} >>\nstream\n".encode("ascii")
-            + stream_data
-            + b"\nendstream\nendobj\n"
-        )
-
-    kids_str = " ".join(f"{pid} 0 R" for pid in page_obj_ids)
-    objects[1] = f"2 0 obj\n<< /Type /Pages /Kids [{kids_str}] /Count {len(page_obj_ids)} >>\nendobj\n".encode("ascii")
-
-    pdf = bytearray(b"%PDF-1.4\n")
-    offsets: List[int] = [0]
-    for obj in objects:
-        offsets.append(len(pdf))
-        pdf.extend(obj)
-
-    xref_pos = len(pdf)
-    pdf.extend(f"xref\n0 {len(offsets)}\n".encode("ascii"))
-    pdf.extend(b"0000000000 65535 f \n")
-    for off in offsets[1:]:
-        pdf.extend(f"{off:010d} 00000 n \n".encode("ascii"))
-
-    pdf.extend(
-        f"trailer\n<< /Size {len(offsets)} /Root 1 0 R >>\nstartxref\n{xref_pos}\n%%EOF\n".encode("ascii")
-    )
-    return bytes(pdf)
+    return bytes(pdf.output())

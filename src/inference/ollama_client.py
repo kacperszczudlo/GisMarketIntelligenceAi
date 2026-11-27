@@ -64,11 +64,12 @@ class OllamaClient:
             "model": self.model,
             "prompt": prompt,
             "stream": False,
+            "keep_alive": "30m",
             "options": {
                 "temperature": temperature,
                 "top_p": 0.9,
-                "num_ctx": 4096,
-                "num_predict": 700,
+                "num_ctx": 3072,
+                "num_predict": 450,
             },
         }
         if system:
@@ -97,11 +98,12 @@ class OllamaClient:
             "model": self.model,
             "prompt": prompt,
             "stream": True,
+            "keep_alive": "30m",
             "options": {
                 "temperature": temperature,
                 "top_p": 0.9,
-                "num_ctx": 4096,
-                "num_predict": 800,
+                "num_ctx": 3072,
+                "num_predict": 500,
             },
         }
         if system:

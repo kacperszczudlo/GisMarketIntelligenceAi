@@ -149,7 +149,9 @@ class TenderReportGenerator:
             s for s in sentences
             if s not in used_sentences
             and any(k in s.lower() for k in ["geobid", "geo-system", "systherm", "geo-info", "impa", "osrodek", "ośrodek", "ewmapa", "ewopis", "turboewid", "infomedica", "portal", "przedmiotowe środki", "karta katalogowa", "certyfikat producenta"])
-        ] or lockin_pool[:2]
+        ] or [s for s in sentences if s not in used_sentences][:2] or [
+            "Brak odrębnych zapisów o rozwiązaniach konkurencyjnych poza wymaganiami technicznymi opisanymi w sekcji 2."
+        ]
         used_sentences.update(comp_pool[:2])
 
         kio_pool = [
