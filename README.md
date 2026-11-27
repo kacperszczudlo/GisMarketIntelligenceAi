@@ -6,7 +6,7 @@ Lokalny system RAG do analizy specyfikacji warunków zamówienia (SWZ), weryfika
 [![Backend](https://img.shields.io/badge/Backend-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
 [![Frontend](https://img.shields.io/badge/Frontend-React_18_%2B_Vite-61DAFB.svg)](https://react.dev/)
 [![Vector DB](https://img.shields.io/badge/Vector_DB-PostgreSQL_%2B_pgvector-blue.svg)](https://github.com/pgvector/pgvector)
-[![LLM Engine](https://img.shields.io/badge/LLM_Engine-Ollama_(gis--analyst)-black.svg)](https://ollama.com/)
+[![LLM Engine](https://img.shields.io/badge/LLM_Engine-Ollama_%28gis--analyst%29-black.svg)](https://ollama.com/)
 [![Evaluation](https://img.shields.io/badge/Evaluation-RAGAS-green.svg)](https://github.com/explodinggradients/ragas)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
