@@ -14,11 +14,14 @@ class OllamaClient:
         self,
         base_url: Optional[str] = None,
         model: Optional[str] = None,
-        timeout: float = 6.0,
+        timeout: float = 180.0,
     ) -> None:
         self.base_url = (base_url or settings.OLLAMA_BASE_URL).rstrip("/")
         self.model = model or settings.OLLAMA_MODEL
         self.timeout = timeout
+
+    def _http_timeout(self) -> httpx.Timeout:
+        return httpx.Timeout(self.timeout, connect=5.0)
 
     async def check_health(self) -> bool:
         """Verifies if the Ollama daemon is reachable and responding."""
@@ -64,15 +67,15 @@ class OllamaClient:
             "options": {
                 "temperature": temperature,
                 "top_p": 0.9,
-                "num_ctx": 2048,
-                "num_predict": 350,
+                "num_ctx": 4096,
+                "num_predict": 700,
             },
         }
         if system:
             payload["system"] = system
 
         url = f"{self.base_url}/api/generate"
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        async with httpx.AsyncClient(timeout=self._http_timeout()) as client:
             response = await client.post(url, json=payload)
             if response.status_code == 404:
                 resolved = await self._resolve_available_model(client)
@@ -97,15 +100,15 @@ class OllamaClient:
             "options": {
                 "temperature": temperature,
                 "top_p": 0.9,
-                "num_ctx": 2048,
-                "num_predict": 450,
+                "num_ctx": 4096,
+                "num_predict": 800,
             },
         }
         if system:
             payload["system"] = system
 
         url = f"{self.base_url}/api/generate"
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        async with httpx.AsyncClient(timeout=self._http_timeout()) as client:
             async with client.stream("POST", url, json=payload) as response:
                 if response.status_code == 404:
                     resolved = await self._resolve_available_model(client)

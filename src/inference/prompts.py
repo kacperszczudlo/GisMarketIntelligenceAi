@@ -1,6 +1,57 @@
 """Strict grounding system prompts and tender analysis user story templates."""
 
-from typing import Optional
+from typing import Dict, List, Optional
+
+CONVERSATIONAL_SWZ_SYSTEM_PROMPT = """
+Jesteś starszym analitykiem zamówień publicznych w branży geodezji, kartografii i systemów informacji przestrzennej (SIP).
+Rozmawiasz z użytkownikiem o konkretnej dokumentacji przetargowej (SWZ / OPZ).
+
+Zasady:
+1. Opieraj się wyłącznie na dostarczonych fragmentach dokumentacji SWZ/OPZ — nie zmyślaj kwot, dat, wymogów ani sygnatur.
+2. Jeśli pytanie jest ogólne, potoczne lub nieprecyzyjne (np. "czy są haczyki?", "na co uważać?", "o co tu chodzi?"), NIE odpowiadaj od razu "Brak informacji", lecz podsumuj najistotniejsze powiązane fakty, ryzyka lub wymagania widoczne w dostarczonych fragmentach i wskaż, co warto doprecyzować.
+3. Traktuj bieżące pytanie jako główne — odwołuj się do poprzedniej wymiany zdań tylko wtedy, gdy bieżące pytanie wyraźnie do niej nawiązuje (np. "a ile?", "a co z terminem?").
+4. Stosuj poprawne rozwinięcia skrótów: KIO = Krajowa Izba Odwoławcza, PZP = Prawo zamówień publicznych, SWZ = Specyfikacja Warunków Zamówienia, OPZ = Opis Przedmiotu Zamówienia. Nigdy nie wymyślaj innych rozwinięć skrótu KIO.
+5. Rozróżniaj warunki udziału w postępowaniu (oceniane zero-jedynkowo: spełnia/nie spełnia, np. doświadczenie firmy, uprawnienia kierownika) od kryteriów oceny ofert (punktowanych procentowo, np. cena, gwarancja/rękojmia).
+6. Podawaj źródła w nawiasach kwadratowych, jeśli są widoczne w tekście (np. [SWZ, Rozdział IV]).
+7. Dopiero gdy dostarczone fragmenty w ogóle nie zawierają żadnych informacji związanych z pytaniem, napisz wprost czego brakuje w dokumentacji.
+8. Pisz naturalnie, konkretnie i zrozumiale po polsku, używając poprawnej terminologii PZP i geodezyjnej.
+""".strip()
+
+
+def build_chat_prompt(
+    question: str,
+    context: str,
+    response_format: str = "Standard (SWZ)",
+    history: Optional[List[Dict[str, str]]] = None,
+) -> str:
+    """Builds an interactive Q&A prompt with format guidance and optional conversation history."""
+    format_hint = {
+        "Zwięzły (Punkty)": "Odpowiedz zwięźle w krótkich, czytelnych punktach.",
+        "Audyt PZP / KIO": "Oceń zapisy pod kątem zgodności z PZP, barier konkurencyjnych i ryzyka KIO.",
+    }.get(response_format, "Odpowiedz rzeczowo i przystępnie na podstawie dokumentacji SWZ.")
+
+    history_block = ""
+    if history:
+        recent = history[-4:]
+        lines = []
+        for msg in recent:
+            role_label = "Użytkownik" if msg.get("role") == "user" else "Analityk"
+            content = (msg.get("content") or "").strip()
+            if content:
+                lines.append(f"{role_label}: {content[:500]}")
+        if lines:
+            history_block = "Poprzednia wymiana zdań:\n" + "\n".join(lines) + "\n\n"
+
+    return (
+        f"{format_hint}\n\n"
+        f"{history_block}"
+        f"Pytanie użytkownika: {question}\n\n"
+        f"Fragmenty dokumentacji SWZ/OPZ:\n"
+        f"---------------------\n"
+        f"{context}\n"
+        f"---------------------\n"
+        f"Odpowiedź:"
+    )
 
 STRICT_GROUNDING_SYSTEM_PROMPT = """
 Jesteś analitykiem zamówień publicznych w branży geodezji, kartografii i systemów informacji przestrzennej (SIP).

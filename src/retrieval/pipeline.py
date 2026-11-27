@@ -24,8 +24,8 @@ class RetrievalPipeline:
     def retrieve(
         self,
         query: str,
-        top_candidates: int = 8,
-        top_k: int = 3,
+        top_candidates: int = 30,
+        top_k: int = 5,
         parent_id: Optional[str] = None,
         procurement_id: Optional[str] = None,
         reorder_context: bool = True,
