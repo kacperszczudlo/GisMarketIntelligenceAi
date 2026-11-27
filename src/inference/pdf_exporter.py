@@ -4,9 +4,9 @@ import re
 import textwrap
 from typing import List, Tuple
 
-_POLISH_TRANS = str.maketrans(
-    "ąćęłńóśźżĄĆĘŁŃÓŚŹŻ–—„”•",
-    "acelnoszzACELNOSZZ--\"\"-",
+_PUNCT_TRANS = str.maketrans(
+    "–—„”•",
+    "--\"\"-",
 )
 
 LINES_PER_PAGE = 46
@@ -14,7 +14,7 @@ WRAP_WIDTH = 86
 
 
 def _normalize_pdf_text(text: str) -> str:
-    clean = text.translate(_POLISH_TRANS)
+    clean = text.translate(_PUNCT_TRANS)
     return clean.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 
 
@@ -50,16 +50,23 @@ def export_report_to_pdf_bytes(markdown_report: str) -> bytes:
         lines[i : i + LINES_PER_PAGE] for i in range(0, max(1, len(lines)), LINES_PER_PAGE)
     ]
 
-    # Object 1: Catalog, Object 2: Pages, Object 3: Regular Font, Object 4: Bold Font
+    # Object 1: Catalog, Object 2: Pages, Object 3: Regular Font, Object 4: Bold Font, Object 5: CP1250 Encoding
     objects: List[bytes] = [
         b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
         b"",  # Placeholder for Pages object
-        b"3 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
-        b"4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n",
+        b"3 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding 5 0 R >>\nendobj\n",
+        b"4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding 5 0 R >>\nendobj\n",
+        (
+            b"5 0 obj\n<< /Type /Encoding /BaseEncoding /WinAnsiEncoding "
+            b"/Differences [ 140 /Sacute 143 /Zacute 156 /sacute 159 /zacute "
+            b"163 /Lslash 165 /Aogonek 175 /Zdotaccent 179 /lslash 185 /aogonek "
+            b"191 /zdotaccent 198 /Cacute 202 /Eogonek 209 /Nacute 211 /Oacute "
+            b"230 /cacute 234 /eogonek 241 /nacute 243 /oacute ] >>\nendobj\n"
+        ),
     ]
 
     page_obj_ids: List[int] = []
-    next_id = 5
+    next_id = 6
 
     for page_idx, page_lines in enumerate(pages, 1):
         content_ops = ["BT", "50 790 Td", "14 TL"]
@@ -74,7 +81,7 @@ def export_report_to_pdf_bytes(markdown_report: str) -> bytes:
         # Footer with page number
         footer = _normalize_pdf_text(f"Strona {page_idx}/{len(pages)} | GisMarket Intelligence AI")
         content_ops.append(f"ET\nBT /F1 8 Tf 50 32 Td ({footer}) Tj ET")
-        stream_data = "\n".join(content_ops).encode("latin-1", errors="ignore")
+        stream_data = "\n".join(content_ops).encode("cp1250", errors="replace")
 
         page_id = next_id
         content_id = next_id + 1

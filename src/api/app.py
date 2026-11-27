@@ -25,6 +25,7 @@ from src.inference.prompts import (
     CONVERSATIONAL_SWZ_SYSTEM_PROMPT,
     STRICT_GROUNDING_SYSTEM_PROMPT,
     build_chat_prompt,
+    build_universal_report_prompt,
 )
 from src.inference.report_generator import TenderReportGenerator
 from src.ingestion.client import NUTS_PROVINCE_MAP
@@ -245,12 +246,16 @@ async def _build_tender_summary(ocds_id: str) -> Dict[str, Any]:
         ) or "Brak dokumentów w bazie."
 
     generator = TenderReportGenerator()
+    ollama_online = await OllamaClient().check_health()
     report = await generator.generate(
         procurement_id=ocds_id,
         title=tender["title"],
         municipality=tender["municipality"],
         context=full_ctx,
-        use_fast_synthesis=True,
+        prompt_override=build_universal_report_prompt(
+            full_ctx[:4500], tender["title"], tender["municipality"]
+        ) if ollama_online else None,
+        use_fast_synthesis=not ollama_online,
     )
     guard = RagasGuard(min_faithfulness=0.95)
     eval_res = guard.evaluate_claims_grounding(report.markdown_report, [full_ctx])
@@ -479,6 +484,59 @@ async def api_procurement_summary(ocds_id: str, _user: UserRecord = Depends(get_
     }
 
 
+def _format_bzp_text(text: str) -> str:
+    """Restores readable paragraph breaks for flattened BZP/SWZ announcements."""
+    formatted = re.sub(r"\s+(SEKCJA\s+[IVX]+\b)", r"\n\n\1", text)
+    formatted = re.sub(r"\s+(\d+\.\d+(?:\.\d+)?\.\))", r"\n\1", formatted)
+    return formatted.strip()
+
+
+def _extract_relevant_window(text: str, query: str, max_len: int = 750) -> str:
+    """Extracts a concise excerpt centered around the first matching query term."""
+    formatted = _format_bzp_text(text)
+    if len(formatted) <= max_len:
+        return formatted
+
+    terms = [
+        w.lower()
+        for w in re.findall(r"[a-ząćęłńóśźż0-9.]{3,}", query)
+        if w.lower() not in {"czy", "jak", "jaki", "jakie", "jaka", "jest", "ile", "dla", "przy", "oraz", "wynoszą", "wynosi", "dokładnie"}
+    ]
+    lower_text = formatted.lower()
+    hit_idx = -1
+    for term in terms:
+        pos = lower_text.find(term[:5] if len(term) > 5 else term)
+        if pos != -1:
+            hit_idx = pos
+            break
+
+    if hit_idx == -1:
+        return formatted[:max_len].rstrip() + "..."
+
+    start = max(0, hit_idx - 180)
+    end = min(len(formatted), start + max_len)
+    if start > 0:
+        space_pos = formatted.find(" ", start)
+        if 0 < space_pos - start < 40:
+            start = space_pos + 1
+    snippet = formatted[start:end].rstrip()
+    if start > 0:
+        snippet = "..." + snippet
+    if end < len(formatted):
+        snippet = snippet + "..."
+    return snippet
+
+
+def _build_llm_context_window(contexts: List[str], full_context: str, query: str, max_chars: int = 4500) -> str:
+    """Builds LLM context without dropping later sections of huge single-node BZP documents."""
+    raw = "\n\n---\n\n".join(contexts).strip() if contexts else full_context.strip()
+    if len(raw) <= max_chars:
+        return raw
+    header = raw[:1500].rstrip()
+    relevant = _extract_relevant_window(raw[1500:], query, max_len=max_chars - 1520)
+    return f"{header}\n\n[...]\n\n{relevant}"
+
+
 def _retrieve_question_context(
     ocds_id: str,
     question: str,
@@ -497,12 +555,12 @@ def _retrieve_question_context(
         it["content"] if isinstance(it, dict) else getattr(it, "content", str(it))
         for it in retrieved
     ]
-    q_context = "\n\n---\n\n".join(contexts).strip() if contexts else full_context.strip()
+    q_context = _build_llm_context_window(contexts, full_context, question, max_chars=4500)
     chunks = [
         {
             "section_title": it.get("section_title") or "Rozdział SWZ",
             "rerank_score": it.get("cross_encoder_score") or it.get("rerank_score") or it.get("rrf_score") or 0.98,
-            "content": it.get("content", ""),
+            "content": _extract_relevant_window(it.get("content", ""), question, max_len=750),
         }
         for it in retrieved[:3]
         if isinstance(it, dict)

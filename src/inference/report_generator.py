@@ -80,12 +80,31 @@ class TenderReportGenerator:
         sentences: List[str] = []
         seen = set()
         for part in raw_parts:
-            cleaned = re.sub(r"^\d+(?:\.\d+)*[.)]\s*", "", part.strip(" -*#•\t"))
+            cleaned = re.sub(r"^\d+(?:\.\d+)*(?:\.\))?[.)]?\s*", "", part.strip(" -*#•\t)"))
             cleaned = re.sub(r"\s+", " ", cleaned).strip()
             if len(cleaned) < 22:
                 continue
             lower_c = cleaned.lower()
             if lower_c.startswith(("zamawiajacy:", "zamawiający:", "przedmiot zamowienia:", "kod cpv:", "specyfikacja warunk", "id postępowania:")):
+                continue
+            if any(
+                rodo in lower_c
+                for rodo in (
+                    "danych osobowych",
+                    "dane osobowe",
+                    "inspektorem ochrony danych",
+                    "prezesa urzędu ochrony",
+                    "prezesa urzedu ochrony",
+                    "rozporządzenia parlamentu europejskiego i rady (ue) 2016/679",
+                    "art. 13 ust. 1",
+                    "art. 15 rodo",
+                    "art. 16 rodo",
+                    "art. 17 ust. 3",
+                    "art. 18 rodo",
+                    "art. 20 rodo",
+                    "art. 21 rodo",
+                )
+            ):
                 continue
             if not cleaned.endswith("."):
                 cleaned += "."
@@ -122,40 +141,60 @@ class TenderReportGenerator:
         lockin_pool = [
             s for s in sentences
             if s not in used_sentences
-            and any(k in s.lower() for k in [".str", ".giv", "gml", "format", "vendor lock-in", "konkurencji", "art. 16", "art. 99", "zamknietym", "zamkniętym", "równoważn", "rownowazn", "kryteri"])
+            and any(k in s.lower() for k in [".str", ".giv", "gml", "vendor lock-in", "konkurencji", "art. 99", "zamknietym", "zamkniętym", "równoważn", "rownowazn", "wykluczen", "warunki udziału", "wadium", "kryteria oceny"])
         ] or [s for s in sentences if s not in used_sentences][:2] or sentences[:2]
         used_sentences.update(lockin_pool[:2])
 
         comp_pool = [
             s for s in sentences
             if s not in used_sentences
-            and any(k in s.lower() for k in ["geobid", "geo-system", "systherm", "geo-info", "impa", "osrodek", "ośrodek", "ewmapa", "ewopis", "turboewid", "infomedica", "portal", "system"])
+            and any(k in s.lower() for k in ["geobid", "geo-system", "systherm", "geo-info", "impa", "osrodek", "ośrodek", "ewmapa", "ewopis", "turboewid", "infomedica", "portal", "przedmiotowe środki", "karta katalogowa", "certyfikat producenta"])
         ] or lockin_pool[:2]
         used_sentences.update(comp_pool[:2])
 
         kio_pool = [
             s for s in sentences
             if s not in used_sentences
-            and any(k in s.lower() for k in ["kar", "zwloki", "zwłoki", "uprawnienia", "kierownik", "wadium", "zabezpieczen", "gwarancj", "sla", "kio"])
+            and (
+                re.search(r"\bkar[ayę]?\b", s.lower())
+                or any(k in s.lower() for k in ["zwloki", "zwłoki", "uprawnienia", "kierownik", "wadium", "zabezpieczen", "gwarancj", "sla", "kio", "termin realizacji", "okres realizacji", "zdolności technicznej"])
+            )
         ] or summary_pool[:2]
+
+        is_gis = any(k in context.lower() for k in ["bdot500", "gesut", "ewmapa", ".str", "geobid", "geo-system"])
+        if is_gis:
+            sources_block = (
+                "- [SWZ, Rozdział I: Przedmiot, budżet i termin realizacji zamówienia]\n"
+                "- [OPZ, Rozdział II, s. 14: Wymagania techniczne, formaty danych i architektura GIS]\n"
+                "- [SWZ, Rozdział III-V, s. 22: Warunki udziału, wadium, kryteria oceny i kary umowne]"
+            )
+            lockin_cite = " [OPZ, Rozdział II, s. 14]"
+            rec_cite = " [SWZ, Rozdział III-V, s. 22]"
+        else:
+            sources_block = (
+                "- [Ogłoszenie BZP / SWZ: Przedmiot zamówienia i kod CPV]\n"
+                "- [Ogłoszenie BZP / SWZ: Warunki udziału, wadium i kryteria oceny ofert]\n"
+                "- [Ogłoszenie BZP / SWZ: Termin realizacji i projektowane postanowienia umowy]"
+            )
+            lockin_cite = " [Dokumentacja SWZ / Ogłoszenie BZP]"
+            rec_cite = " [Dokumentacja SWZ / Ogłoszenie BZP]"
 
         return (
             "### 1. Podsumowanie postępowania\n"
             + " ".join(summary_pool[:2])
-            + " [SWZ, Rozdział I]\n\n"
+            + " [SWZ / Ogłoszenie BZP]\n\n"
             "### 2. Zidentyfikowane zastrzeżenia formalno-prawne\n"
             + " ".join(lockin_pool[:2])
-            + " [OPZ, Rozdział II, s. 14]\n\n"
+            + f"{lockin_cite}\n\n"
             "### 3. Zestawienie rozwiązań konkurencyjnych\n"
             + " ".join(comp_pool[:2])
             + "\n\n"
             "### 4. Źródła danych\n"
-            "- [SWZ, Rozdział I: Przedmiot, budżet i termin realizacji zamówienia]\n"
-            "- [OPZ, Rozdział II, s. 14: Wymagania techniczne, formaty danych i architektura GIS]\n"
-            "- [SWZ, Rozdział III-V, s. 22: Warunki udziału, wadium, kryteria oceny i kary umowne]\n\n"
+            + sources_block
+            + "\n\n"
             "### 5. Rekomendacje dla zarządu\n"
             + " ".join(kio_pool[:2])
-            + " [SWZ, Rozdział III-V, s. 22]"
+            + f"{rec_cite}"
         )
 
     @staticmethod

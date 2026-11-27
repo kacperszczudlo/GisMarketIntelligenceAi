@@ -66,6 +66,35 @@ Zasady generowania odpowiedzi:
 """.strip()
 
 
+def build_universal_report_prompt(context: str, title: str, municipality: str) -> str:
+    """Builds a domain-agnostic PZP audit report prompt grounded in the actual tender context."""
+    return f"""
+Zamawiający: {municipality}
+Przedmiot zamówienia: {title}
+
+Fragmenty dokumentacji (SWZ / OPZ / Ogłoszenie BZP):
+---------------------
+{context}
+---------------------
+Przygotuj zwięzły raport analityczny w języku polskim dokładnie w poniższej strukturze 5 nagłówków Markdown (nie wymyślaj wymagań GIS ani formatu .str, jeśli nie występują w powyższym tekście):
+
+### 1. Podsumowanie postępowania
+Opisz krótko przedmiot zamówienia, budżet/wartość, termin realizacji i tryb postępowania.
+
+### 2. Zidentyfikowane zastrzeżenia formalno-prawne
+Wskaż kryteria oceny ofert, warunki udziału, wadium, kary umowne lub ewentualne bariery konkurencyjne (np. wymogi jednego producenta, brak limitu kar, wysokie progi).
+
+### 3. Zestawienie rozwiązań konkurencyjnych
+Wymień wymagane systemy, standardy, certyfikaty lub przedmiotowe środki dowodowe (jeśli brak danych o konkretnych dostawcach, napisz to wprost).
+
+### 4. Źródła danych
+Wypisz w punktach wyłącznie sekcje/rozdziały widoczne w dostarczonym tekście.
+
+### 5. Rekomendacje dla zarządu
+Podaj 2-3 praktyczne wnioski (na co zwrócić uwagę przed złożeniem oferty lub czy są podstawy do pytań do SWZ / odwołania do KIO).
+""".strip()
+
+
 def build_grounded_prompt(query: str, context: str) -> str:
     """Wraps query and retrieved context with strict grounding directives."""
     return f"""
