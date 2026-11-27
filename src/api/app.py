@@ -21,10 +21,16 @@ from src.database.connection import db_manager
 from src.evaluation.ragas_guard import RagasGuard
 from src.inference.ollama_client import OllamaClient
 from src.inference.pdf_exporter import export_report_to_pdf_bytes
-from src.inference.prompts import STRICT_GROUNDING_SYSTEM_PROMPT
+from src.inference.prompts import (
+    CONVERSATIONAL_SWZ_SYSTEM_PROMPT,
+    STRICT_GROUNDING_SYSTEM_PROMPT,
+    build_chat_prompt,
+    build_universal_report_prompt,
+)
 from src.inference.report_generator import TenderReportGenerator
 from src.ingestion.client import NUTS_PROVINCE_MAP
 from src.retrieval.pipeline import RetrievalPipeline
+from src.retrieval.query_expander import expand_swz_query
 
 logger = logging.getLogger("src.api")
 
@@ -250,7 +256,7 @@ async def _build_tender_summary(ocds_id: str) -> Dict[str, Any]:
     guard = RagasGuard(min_faithfulness=0.95)
     eval_res = guard.evaluate_claims_grounding(report.markdown_report, [full_ctx])
     sections = _parse_report_sections(report.raw_llm_output)
-    metrics = await _enrich_metrics_with_llm(full_ctx, _extract_tender_metrics(full_ctx))
+    metrics = _extract_tender_metrics(full_ctx)
 
     summary_payload = {
         "tender": tender,
@@ -336,6 +342,7 @@ class ToggleActiveRequest(BaseModel):
 class AskQuestionRequest(BaseModel):
     question: str = Field(..., min_length=1)
     response_format: str = Field(default="Standard (SWZ)")
+    history: List[Dict[str, str]] = Field(default_factory=list)
 
 
 def get_current_user(
@@ -473,6 +480,90 @@ async def api_procurement_summary(ocds_id: str, _user: UserRecord = Depends(get_
     }
 
 
+def _format_bzp_text(text: str) -> str:
+    """Restores readable paragraph breaks for flattened BZP/SWZ announcements."""
+    formatted = re.sub(r"\s+(SEKCJA\s+[IVX]+\b)", r"\n\n\1", text)
+    formatted = re.sub(r"\s+(\d+\.\d+(?:\.\d+)?\.\))", r"\n\1", formatted)
+    return formatted.strip()
+
+
+def _extract_relevant_window(text: str, query: str, max_len: int = 750) -> str:
+    """Extracts a concise excerpt centered around the first matching query term."""
+    formatted = _format_bzp_text(text)
+    if len(formatted) <= max_len:
+        return formatted
+
+    terms = [
+        w.lower()
+        for w in re.findall(r"[a-ząćęłńóśźż0-9.]{3,}", query)
+        if w.lower() not in {"czy", "jak", "jaki", "jakie", "jaka", "jest", "ile", "dla", "przy", "oraz", "wynoszą", "wynosi", "dokładnie"}
+    ]
+    lower_text = formatted.lower()
+    hit_idx = -1
+    for term in terms:
+        pos = lower_text.find(term[:5] if len(term) > 5 else term)
+        if pos != -1:
+            hit_idx = pos
+            break
+
+    if hit_idx == -1:
+        return formatted[:max_len].rstrip() + "..."
+
+    start = max(0, hit_idx - 180)
+    end = min(len(formatted), start + max_len)
+    if start > 0:
+        space_pos = formatted.find(" ", start)
+        if 0 < space_pos - start < 40:
+            start = space_pos + 1
+    snippet = formatted[start:end].rstrip()
+    if start > 0:
+        snippet = "..." + snippet
+    if end < len(formatted):
+        snippet = snippet + "..."
+    return snippet
+
+
+def _build_llm_context_window(contexts: List[str], full_context: str, query: str, max_chars: int = 4500) -> str:
+    """Builds LLM context without dropping later sections of huge single-node BZP documents."""
+    raw = "\n\n---\n\n".join(contexts).strip() if contexts else full_context.strip()
+    if len(raw) <= max_chars:
+        return raw
+    header = raw[:1500].rstrip()
+    relevant = _extract_relevant_window(raw[1500:], query, max_len=max_chars - 1520)
+    return f"{header}\n\n[...]\n\n{relevant}"
+
+
+def _retrieve_question_context(
+    ocds_id: str,
+    question: str,
+    full_context: str,
+) -> tuple[str, List[Dict[str, Any]]]:
+    """Expands colloquial queries for retrieval and builds grounded context + UI chunks."""
+    pipeline = _get_pipeline()
+    expanded_query = expand_swz_query(question)
+    retrieved = pipeline.retrieve(
+        query=expanded_query,
+        procurement_id=ocds_id,
+        top_candidates=30,
+        top_k=3,
+    )
+    contexts = [
+        it["content"] if isinstance(it, dict) else getattr(it, "content", str(it))
+        for it in retrieved
+    ]
+    q_context = _build_llm_context_window(contexts, full_context, question, max_chars=4500)
+    chunks = [
+        {
+            "section_title": it.get("section_title") or "Rozdział SWZ",
+            "rerank_score": it.get("cross_encoder_score") or it.get("rerank_score") or it.get("rrf_score") or 0.98,
+            "content": _extract_relevant_window(it.get("content", ""), question, max_len=750),
+        }
+        for it in retrieved[:3]
+        if isinstance(it, dict)
+    ]
+    return q_context, chunks
+
+
 @app.post("/api/procurements/{ocds_id}/ask")
 async def api_ask_procurement(
     ocds_id: str,
@@ -480,32 +571,36 @@ async def api_ask_procurement(
     _user: UserRecord = Depends(get_current_user),
 ) -> Dict[str, Any]:
     summary = await _build_tender_summary(ocds_id)
-    pipeline = _get_pipeline()
-    retrieved = pipeline.retrieve(query=body.question, procurement_id=ocds_id, top_k=5)
-    contexts = [
-        it["content"] if isinstance(it, dict) else getattr(it, "content", str(it))
-        for it in retrieved
-    ]
-    q_context = ("\n".join(contexts[:3]) + "\n" + summary["full_context"]).strip()
-    answer = TenderReportGenerator.answer_specific_question(body.question, q_context)
+    q_context, chunks = _retrieve_question_context(ocds_id, body.question, summary["full_context"])
 
-    if body.response_format == "Zwięzły (Punkty)" and answer:
-        parts = [p.strip() for p in re.split(r"(?<=[.!?])\s+", answer) if p.strip()]
-        if len(parts) > 1:
-            answer = " • ".join(parts)
-    elif body.response_format == "Audyt PZP / KIO" and answer:
-        answer = f"[Tryb audytu PZP/KIO] {answer}"
+    answer = ""
+    engine = "fallback"
+    client = OllamaClient(timeout=180.0)
+    try:
+        if await client.check_health():
+            prompt = build_chat_prompt(
+                question=body.question,
+                context=q_context[:4500],
+                response_format=body.response_format,
+                history=body.history,
+            )
+            answer = await client.generate(
+                prompt=prompt,
+                system=CONVERSATIONAL_SWZ_SYSTEM_PROMPT,
+                temperature=0.1,
+            )
+            if answer:
+                engine = "ollama"
+    except Exception as exc:
+        logger.warning("Ollama /ask generation failed, using fallback (%r)", exc)
 
-    chunks = [
-        {
-            "section_title": it.get("section_title") or "Rozdział SWZ",
-            "rerank_score": it.get("rerank_score") or it.get("rrf_score") or 0.98,
-            "content": it.get("content", ""),
-        }
-        for it in retrieved[:3]
-        if isinstance(it, dict)
-    ]
-    return {"question": body.question, "answer": answer, "chunks": chunks}
+    if not answer:
+        answer = _format_answer_text(
+            TenderReportGenerator.answer_specific_question(body.question, q_context),
+            body.response_format,
+        )
+
+    return {"question": body.question, "answer": answer, "chunks": chunks, "engine": engine}
 
 
 def _format_answer_text(answer: str, response_format: str) -> str:
@@ -525,50 +620,37 @@ async def api_ask_procurement_stream(
     _user: UserRecord = Depends(get_current_user),
 ) -> StreamingResponse:
     summary = await _build_tender_summary(ocds_id)
-    pipeline = _get_pipeline()
-    retrieved = pipeline.retrieve(query=body.question, procurement_id=ocds_id, top_k=5)
-    contexts = [
-        it["content"] if isinstance(it, dict) else getattr(it, "content", str(it))
-        for it in retrieved
-    ]
-    q_context = ("\n".join(contexts[:3]) + "\n" + summary["full_context"]).strip()
-    chunks = [
-        {
-            "section_title": it.get("section_title") or "Rozdział SWZ",
-            "rerank_score": it.get("rerank_score") or it.get("rrf_score") or 0.98,
-            "content": it.get("content", ""),
-        }
-        for it in retrieved[:3]
-        if isinstance(it, dict)
-    ]
+    q_context, chunks = _retrieve_question_context(ocds_id, body.question, summary["full_context"])
 
     async def event_stream():
         yield f"data: {json.dumps({'type': 'chunks', 'chunks': chunks}, ensure_ascii=False)}\n\n"
 
-        client = OllamaClient(timeout=18.0)
+        client = OllamaClient(timeout=180.0)
         streamed_any = False
         try:
             if await client.check_health():
-                format_hint = {
-                    "Zwięzły (Punkty)": "Odpowiedz zwięźle w krótkich punktach.",
-                    "Audyt PZP / KIO": "Oceń zapis pod kątem zgodności z PZP i ryzyka KIO.",
-                }.get(body.response_format, "Odpowiedz rzeczowo na podstawie dokumentacji SWZ.")
-                prompt = (
-                    f"{format_hint}\n\n"
-                    f"Pytanie: {body.question}\n\n"
-                    f"Fragmenty SWZ:\n{q_context[:3500]}"
+                prompt = build_chat_prompt(
+                    question=body.question,
+                    context=q_context[:4500],
+                    response_format=body.response_format,
+                    history=body.history,
                 )
                 async for token in client.stream_generate(
                     prompt=prompt,
-                    system=STRICT_GROUNDING_SYSTEM_PROMPT,
-                    temperature=0.0,
+                    system=CONVERSATIONAL_SWZ_SYSTEM_PROMPT,
+                    temperature=0.1,
                 ):
+                    if not streamed_any:
+                        yield f"data: {json.dumps({'type': 'meta', 'engine': 'ollama'}, ensure_ascii=False)}\n\n"
                     streamed_any = True
                     yield f"data: {json.dumps({'type': 'token', 'text': token}, ensure_ascii=False)}\n\n"
         except Exception as exc:
-            logger.debug("Streaming via Ollama failed, using grounded fallback (%s)", exc)
+            logger.warning("Streaming via Ollama failed, using grounded fallback (%s)", exc)
 
         if not streamed_any:
+            yield f"data: {json.dumps({'type': 'meta', 'engine': 'fallback'}, ensure_ascii=False)}\n\n"
+            notice = "*[Tryb awaryjny — Ollama niedostępna lub przekroczyła czas odpowiedzi]*\n\n"
+            yield f"data: {json.dumps({'type': 'token', 'text': notice}, ensure_ascii=False)}\n\n"
             fallback = _format_answer_text(
                 TenderReportGenerator.answer_specific_question(body.question, q_context),
                 body.response_format,
@@ -589,12 +671,32 @@ async def api_ask_procurement_stream(
 
 
 @app.get("/api/procurements/{ocds_id}/report.pdf")
-async def api_download_pdf(ocds_id: str, _user: UserRecord = Depends(get_current_user)) -> Response:
-    if ocds_id not in _PDF_CACHE:
+async def api_download_pdf(
+    ocds_id: str,
+    use_llm: bool = Query(default=False),
+    _user: UserRecord = Depends(get_current_user),
+) -> Response:
+    cache_key = f"{ocds_id}:{'llm' if use_llm else 'fast'}"
+    if cache_key not in _PDF_CACHE:
         summary = await _build_tender_summary(ocds_id)
-        _PDF_CACHE[ocds_id] = export_report_to_pdf_bytes(summary["markdown_report"])
+        md_report = summary["markdown_report"]
+        if use_llm and await OllamaClient().check_health():
+            tender = summary["tender"]
+            full_ctx = summary["full_context"]
+            llm_report = await TenderReportGenerator().generate(
+                procurement_id=ocds_id,
+                title=tender["title"],
+                municipality=tender["municipality"],
+                context=full_ctx,
+                prompt_override=build_universal_report_prompt(
+                    full_ctx[:4500], tender["title"], tender["municipality"]
+                ),
+                use_fast_synthesis=False,
+            )
+            md_report = llm_report.markdown_report
+        _PDF_CACHE[cache_key] = export_report_to_pdf_bytes(md_report)
     return Response(
-        content=_PDF_CACHE[ocds_id],
+        content=_PDF_CACHE[cache_key],
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="raport_{ocds_id}.pdf"'},
     )

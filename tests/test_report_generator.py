@@ -239,6 +239,12 @@ def test_should_export_markdown_report_to_valid_multipage_pdf_bytes() -> None:
 
     assert pdf_bytes.startswith(b"%PDF-1.4\n")
     assert pdf_bytes.rstrip().endswith(b"%%EOF")
-    assert b"/Count 2" in pdf_bytes
-    assert b"Strona 1/2" in pdf_bytes
-    assert b"Strona 2/2" in pdf_bytes
+    import pypdfium2 as pdfium
+
+    doc = pdfium.PdfDocument(pdf_bytes)
+    assert len(doc) >= 2
+    page1_text = doc[0].get_textpage().get_text_range()
+    page2_text = doc[1].get_textpage().get_text_range()
+    assert f"Strona 1/{len(doc)}" in page1_text
+    assert f"Strona 2/{len(doc)}" in page2_text
+    assert "Zamawiający żąda" in page1_text

@@ -94,18 +94,23 @@ export const api = {
     ocdsId,
     question,
     responseFormat,
-    { onChunks, onToken, onDone } = {},
+    { signal, history = [], onChunks, onToken, onDone } = {},
   ) => {
     const token = getStoredToken();
     const res = await fetch(
       `/api/procurements/${encodeURIComponent(ocdsId)}/ask/stream`,
       {
         method: "POST",
+        signal,
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ question, response_format: responseFormat }),
+        body: JSON.stringify({
+          question,
+          response_format: responseFormat,
+          history,
+        }),
       },
     );
 

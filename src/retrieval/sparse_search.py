@@ -6,17 +6,28 @@ from src.database.connection import db_manager
 logger = logging.getLogger(__name__)
 
 
+_POLISH_STOPWORDS = frozenset({
+    "czy", "jak", "jaki", "jakie", "jaka", "jest", "oraz", "dla", "przy",
+    "lub", "ale", "nie", "tak", "ten", "ta", "to", "co", "kto", "gdzie",
+    "kiedy", "ile", "na", "do", "od", "po", "za", "ze", "we", "pod", "nad",
+    "bez", "przez", "który", "które", "która", "ktore", "ktora", "ktory",
+    "można", "mozna", "są", "sa", "być", "byc", "mieć", "miec", "tym",
+})
+
+
 class SparseRetriever:
     """Executes lexical search on content_tsvector using PostgreSQL ts_rank_cd."""
 
     @staticmethod
     def _prepare_tsquery_terms(query: str) -> str:
-        """Sanitizes raw natural query into an OR/AND joined tsquery expression."""
+        """Sanitizes raw natural query into an OR-joined tsquery expression, filtering Polish stop-words."""
         cleaned = re.sub(r"[^\w\s\.]", " ", query, flags=re.UNICODE)
         words = [w.strip(" .") for w in cleaned.split() if len(w.strip(" .")) >= 2]
         if not words:
             return ""
-        return " | ".join(words)
+        meaningful = [w for w in words if w.lower() not in _POLISH_STOPWORDS]
+        selected = meaningful or words
+        return " | ".join(selected)
 
     def _execute_query(
         self,
