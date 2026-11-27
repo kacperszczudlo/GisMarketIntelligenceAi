@@ -480,6 +480,7 @@ function TenderDetailView({
   const [auditTab, setAuditTab] = useState("summary");
 
   const [question, setQuestion] = useState("");
+  const [questionQueue, setQuestionQueue] = useState([]);
   const [responseFormat, setResponseFormat] = useState(FORMAT_OPTIONS[0]);
   const [asking, setAsking] = useState(false);
   const [askError, setAskError] = useState("");
@@ -489,6 +490,8 @@ function TenderDetailView({
 
   const chatEndRef = useRef(null);
   const composerRef = useRef(null);
+  const abortRef = useRef(null);
+  const queuePausedRef = useRef(false);
 
   const setMessages = (updater) => {
     onUpdateMessages(tender.id, updater);
@@ -556,13 +559,42 @@ function TenderDetailView({
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [templatesOpen]);
 
-  async function submitQuestion(textToSend) {
-    const q = (textToSend ?? question).trim();
-    if (!q || asking) return;
+  function handleStopGeneration() {
+    queuePausedRef.current = true;
+    abortRef.current?.abort();
+  }
 
+  function handleRemoveQueued(id) {
+    setQuestionQueue((prev) => prev.filter((item) => item.id !== id));
+  }
+
+  async function submitQuestion(textToSend, formatOverride) {
+    const q = (textToSend ?? question).trim();
+    if (!q) return;
+
+    const fmt = formatOverride ?? responseFormat;
+    if (asking) {
+      setTemplatesOpen(false);
+      setQuestion("");
+      setQuestionQueue((prev) => [
+        ...prev,
+        { id: `${Date.now()}-${Math.random()}`, text: q, format: fmt },
+      ]);
+      return;
+    }
+
+    queuePausedRef.current = false;
     setAskError("");
     setTemplatesOpen(false);
-    setQuestion("");
+    if (textToSend === undefined) {
+      setQuestion("");
+    }
+
+    const historyPayload = messages
+      .filter((m) => m.text)
+      .slice(-4)
+      .map((m) => ({ role: m.role, content: m.text }));
+
     setMessages((prev) => [
       ...prev,
       { role: "user", text: q },
@@ -570,8 +602,13 @@ function TenderDetailView({
     ]);
     setAsking(true);
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
-      await api.askQuestionStream(tender.id, q, responseFormat, {
+      await api.askQuestionStream(tender.id, q, fmt, {
+        signal: controller.signal,
+        history: historyPayload,
         onChunks: (chunks) => {
           setMessages((prev) => {
             const next = [...prev];
@@ -594,18 +631,43 @@ function TenderDetailView({
         },
       });
     } catch (err) {
-      setAskError(err.message || "Błąd podczas generowania odpowiedzi.");
-      setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (last?.role === "assistant" && !last.text) {
-          return prev.slice(0, -1);
-        }
-        return prev;
-      });
+      if (err?.name === "AbortError") {
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === "assistant") {
+            if (!last.text) return prev.slice(0, -1);
+            const next = [...prev];
+            next[next.length - 1] = {
+              ...last,
+              text: `${last.text}\n\n*(Generowanie zatrzymane przez użytkownika)*`,
+            };
+            return next;
+          }
+          return prev;
+        });
+      } else {
+        setAskError(err.message || "Błąd podczas generowania odpowiedzi.");
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === "assistant" && !last.text) {
+            return prev.slice(0, -1);
+          }
+          return prev;
+        });
+      }
     } finally {
+      abortRef.current = null;
       setAsking(false);
     }
   }
+
+  useEffect(() => {
+    if (!asking && !queuePausedRef.current && questionQueue.length > 0) {
+      const [nextItem, ...rest] = questionQueue;
+      setQuestionQueue(rest);
+      submitQuestion(nextItem.text, nextItem.format);
+    }
+  }, [asking, questionQueue]);
 
   function handleSend(e) {
     if (e) e.preventDefault();
@@ -895,7 +957,12 @@ function TenderDetailView({
               <button
                 type="button"
                 className="btn btn-secondary btn-compact"
-                onClick={() => setMessages([])}
+                onClick={() => {
+                  queuePausedRef.current = true;
+                  abortRef.current?.abort();
+                  setQuestionQueue([]);
+                  setMessages([]);
+                }}
               >
                 Wyczyść
               </button>
@@ -1018,9 +1085,46 @@ function TenderDetailView({
             </div>
           )}
 
+          {questionQueue.length > 0 && (
+            <div className="queue-strip" aria-label="Kolejka pytań">
+              <div className="queue-strip-head">
+                <span>Kolejka pytań ({questionQueue.length})</span>
+                <button
+                  type="button"
+                  className="text-action-btn"
+                  onClick={() => setQuestionQueue([])}
+                >
+                  Wyczyść kolejkę
+                </button>
+              </div>
+              <div className="queue-items">
+                {questionQueue.map((item, qIdx) => (
+                  <div key={item.id} className="queue-chip" title={item.text}>
+                    <span className="queue-chip-text">
+                      {qIdx + 1}. {item.text}
+                    </span>
+                    <button
+                      type="button"
+                      className="queue-chip-remove"
+                      onClick={() => handleRemoveQueued(item.id)}
+                      aria-label={`Usuń pytanie z kolejki: ${item.text}`}
+                      title="Usuń z kolejki"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <textarea
             className="composer-textarea"
-            placeholder="Zadaj pytanie dotyczące dokumentacji SWZ..."
+            placeholder={
+              asking
+                ? "Generuję odpowiedź... Wpisz kolejne pytanie, aby dodać je do kolejki."
+                : "Zadaj pytanie dotyczące dokumentacji SWZ..."
+            }
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -1065,15 +1169,41 @@ function TenderDetailView({
               </div>
             </div>
 
-            <button
-              type="submit"
-              className="btn-icon primary"
-              disabled={!question.trim() || asking}
-              title="Wyślij pytanie"
-              aria-label="Wyślij pytanie"
-            >
-              {asking ? <span className="spinner" /> : <SendIcon size={17} />}
-            </button>
+            <div className="composer-actions">
+              {asking && (
+                <button
+                  type="button"
+                  className="btn btn-compact btn-stop"
+                  onClick={handleStopGeneration}
+                  title="Zatrzymaj generowanie"
+                  aria-label="Zatrzymaj generowanie"
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      display: "inline-block",
+                      width: 10,
+                      height: 10,
+                      borderRadius: 2,
+                      background: "currentColor",
+                    }}
+                  />
+                  <span>Zatrzymaj</span>
+                </button>
+              )}
+
+              <button
+                type="submit"
+                className="btn-icon primary"
+                disabled={!question.trim()}
+                title={asking ? "Dodaj pytanie do kolejki" : "Wyślij pytanie"}
+                aria-label={
+                  asking ? "Dodaj pytanie do kolejki" : "Wyślij pytanie"
+                }
+              >
+                <SendIcon size={17} />
+              </button>
+            </div>
           </div>
         </div>
       </form>
